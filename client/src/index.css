@@ -42,8 +42,8 @@
   --color-sidebar-ring: var(--sidebar-ring);
   
   /* Custom Fonts */
-  --font-sans: "Noto Sans JP", sans-serif;
-  --font-serif: "Noto Serif JP", serif;
+  --font-sans: "Zen Maru Gothic", sans-serif;
+  --font-serif: "Zen Maru Gothic", sans-serif;
 }
 
 :root {
@@ -150,6 +150,9 @@
     background-blend-mode: multiply;
     background-size: cover;
     background-attachment: fixed;
+    /* Iframe optimization: ensure content can scroll if needed */
+    min-height: 100vh;
+    overflow-y: auto;
   }
   
   h1, h2, h3, h4, h5, h6 {

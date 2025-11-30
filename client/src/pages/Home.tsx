@@ -23,13 +23,13 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-0 opacity-10">
-        <div className="absolute top-10 right-10 text-9xl font-serif writing-vertical-rl select-none">
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-0 opacity-10 overflow-hidden">
+        <div className="absolute top-4 right-4 md:top-10 md:right-10 text-6xl md:text-9xl font-serif writing-vertical-rl select-none whitespace-nowrap">
           日本住所
         </div>
-        <div className="absolute bottom-10 left-10 text-8xl font-serif writing-vertical-rl select-none">
+        <div className="absolute bottom-4 left-4 md:bottom-10 md:left-10 text-5xl md:text-8xl font-serif writing-vertical-rl select-none whitespace-nowrap">
           仮想生成
         </div>
       </div>

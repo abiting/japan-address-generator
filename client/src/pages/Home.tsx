@@ -31,6 +31,9 @@ export default function Home() {
           <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-widest text-primary">
             Virtual Japan Address Generator
           </h1>
+          <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed">
+            POSTAL CODE、都道府県、市区町村、町名均為真實資料，僅番地（包含丁目）為隨機生成的虛擬資訊。
+          </p>
         </div>
 
         <Card className="border-2 border-primary/10 shadow-xl bg-card/80 backdrop-blur-sm">

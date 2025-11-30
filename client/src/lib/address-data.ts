@@ -98,8 +98,14 @@ export function generateAddress(): JapaneseAddress {
   const block = `${chome} 丁目 ${banchi} 番 ${go} 号`;
   
   // 5. 生成郵遞區號
-  const prefixes = postalPrefixes[prefecture] || ["00"];
-  const prefix = getRandomElement(prefixes);
+  const prefixes = postalPrefixes[prefecture] || ["000"];
+  // 確保前綴為 3 碼，例如 "00" -> "000", "13" -> "130" (這裡假設前綴是前兩碼，需補第三碼，或直接使用三碼前綴)
+  // 根據原始資料 postalPrefixes 只有兩碼，日本郵遞區號前三碼代表區域
+  // 我們將隨機生成第三碼 (0-9) 來補足三碼格式
+  const prefixBase = getRandomElement(prefixes);
+  const prefixSuffix = getRandomNumber(0, 9).toString();
+  const prefix = (prefixBase + prefixSuffix).padEnd(3, '0').slice(0, 3);
+  
   const suffix = getRandomNumber(1, 9999).toString().padStart(4, '0');
   const postalCode = `${prefix}-${suffix}`;
   

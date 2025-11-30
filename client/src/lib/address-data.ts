@@ -94,6 +94,7 @@ export function generateAddress(): JapaneseAddress {
   const go = getRandomNumber(1, 30);
   
   // 格式化番地：數字與日文間空一格
+  // 確保數字前後都有空格，例如 "9 丁目 25 番 20 号"
   const block = `${chome} 丁目 ${banchi} 番 ${go} 号`;
   
   // 5. 生成郵遞區號

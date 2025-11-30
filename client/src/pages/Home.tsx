@@ -111,22 +111,22 @@ export default function Home() {
             {/* Breakdown Section */}
             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-all duration-500 delay-150 ${isAnimating ? 'opacity-50 blur-sm' : 'opacity-100 blur-0'}`}>
               <AddressComponent 
-                label="都道府県 (Prefecture)" 
+                label="都道府県（Prefecture）" 
                 value={address.prefecture} 
                 onCopy={() => copyToClipboard(address.prefecture, "都道府県")}
               />
               <AddressComponent 
-                label="市区町村 (City/Ward)" 
+                label="市区町村（City/Ward）" 
                 value={address.city} 
                 onCopy={() => copyToClipboard(address.city, "市区町村")}
               />
               <AddressComponent 
-                label="町名 (Town)" 
+                label="町名（Town）" 
                 value={address.town} 
                 onCopy={() => copyToClipboard(address.town, "町名")}
               />
               <AddressComponent 
-                label="番地 (Block/Number)" 
+                label="番地（Block/Number）" 
                 value={address.block} 
                 onCopy={() => copyToClipboard(address.block, "番地")}
               />
@@ -145,6 +145,16 @@ export default function Home() {
           <p className="text-xs text-muted-foreground mt-4">
             注意：本工具生成的地址均為虛擬數據，僅供測試與註冊使用，請勿用於非法用途。
           </p>
+          <div className="mt-8 pt-4 border-t border-border/30">
+            <a 
+              href="https://abiting.cc" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-primary transition-colors font-sans"
+            >
+              Copyright © 阿比丁的第二個家
+            </a>
+          </div>
         </div>
       </main>
     </div>

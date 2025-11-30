@@ -133,10 +133,7 @@ export default function Home() {
           </Button>
           <div className="mt-8 space-y-2">
             <p className="text-xs text-muted-foreground">
-              注意：本工具生成的地址均為虛擬數據，僅供測試與註冊使用，請勿用於非法用途。
-            </p>
-            <p className="text-xs text-muted-foreground">
-              ※ 郵遞區號、都道府県、市區町村、町名均為真實資料，僅番地號碼為虛擬生成。
+              請注意，本工具僅供示例與測試用途，請勿用於非法行為。
             </p>
             <p className="text-xs text-muted-foreground pt-2">
               Copyright © <a 

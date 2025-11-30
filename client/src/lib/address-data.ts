@@ -104,7 +104,8 @@ export function generateAddress(): JapaneseAddress {
   const postalCode = `${prefix}-${suffix}`;
   
   // 6. 組合完整地址
-  const fullAddress = `${prefecture}${city}${town}${block}`;
+  // 確保町名與番地之間有空格，例如 "自由が丘 3 丁目"
+  const fullAddress = `${prefecture}${city}${town} ${block}`;
   
   return {
     postalCode,

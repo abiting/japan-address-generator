@@ -29,11 +29,8 @@ export default function Home() {
       <main className="w-full max-w-2xl z-10 relative">
         <div className="text-center mb-12 space-y-4">
           <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-widest text-primary">
-            虛擬日本地址產生器
+            Virtual Japan Address Generator
           </h1>
-          <p className="text-muted-foreground font-sans tracking-wide">
-            一鍵生成格式正確的虛擬日本地址，適用於註冊與測試
-          </p>
         </div>
 
         <Card className="border-2 border-primary/10 shadow-xl bg-card/80 backdrop-blur-sm">

@@ -42,8 +42,10 @@
   --color-sidebar-ring: var(--sidebar-ring);
   
   /* Custom Fonts */
-  --font-sans: "Zen Maru Gothic", sans-serif;
-  --font-serif: "Zen Maru Gothic", sans-serif;
+  /* Zen Maru Gothic 主要支援日文，繁體中文缺字時會回退。
+     為了確保「虛」與「產」等字體一致，我們將 Noto Sans TC 加入 fallback */
+  --font-sans: "Zen Maru Gothic", "Noto Sans TC", sans-serif;
+  --font-serif: "Zen Maru Gothic", "Noto Serif TC", serif;
 }
 
 :root {
@@ -146,7 +148,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    background-image: url('/assets/washi-bg.jpg');
+    background-image: url('/assets/clean-washi-bg.jpg');
     background-blend-mode: multiply;
     background-size: cover;
     background-attachment: fixed;

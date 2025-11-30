@@ -142,18 +142,23 @@ export default function Home() {
           >
             重新生成
           </Button>
-          <p className="text-xs text-muted-foreground mt-4">
-            注意：本工具生成的地址均為虛擬數據，僅供測試與註冊使用，請勿用於非法用途。
-          </p>
-          <div className="mt-8 pt-4 border-t border-border/30">
-            <a 
-              href="https://abiting.cc" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-primary transition-colors font-sans"
-            >
-              Copyright © 阿比丁的第二個家
-            </a>
+          <div className="mt-8 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              注意：本工具生成的地址均為虛擬數據，僅供測試與註冊使用，請勿用於非法用途。
+            </p>
+            <p className="text-xs text-muted-foreground">
+              ※ 郵遞區號前 3 碼為真實對應都道府県，後 4 碼為隨機生成，可通過大部分格式驗證。
+            </p>
+            <p className="text-xs text-muted-foreground pt-2">
+              Copyright © <a 
+                href="https://abiting.cc" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors underline decoration-dotted underline-offset-4"
+              >
+                阿比丁的第二個家
+              </a>
+            </p>
           </div>
         </div>
       </main>

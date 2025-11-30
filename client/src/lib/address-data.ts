@@ -1,116 +1,62 @@
-// 日本地址資料庫與生成邏輯
+import realAddressDataRaw from './real-address-data.json';
 
-// 都道府県列表
-export const prefectures = [
-  "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
-  "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
-  "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
-  "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
-  "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
-  "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
-  "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"
-];
-
-// 常見市區町村範例（部分真實，用於混合生成）
-export const cities = [
-  "札幌市中央区", "仙台市青葉区", "さいたま市大宮区", "千葉市中央区", "横浜市中区",
-  "川崎市川崎区", "相模原市中央区", "新潟市中央区", "静岡市葵区", "浜松市中区",
-  "名古屋市中区", "京都市中京区", "大阪市北区", "堺市堺区", "神戸市中央区",
-  "岡山市北区", "広島市中区", "北九州市小倉北区", "福岡市博多区", "熊本市中央区",
-  "千代田区", "中央区", "港区", "新宿区", "文京区", "台東区", "墨田区", "江東区",
-  "品川区", "目黒区", "大田区", "世田谷区", "渋谷区", "中野区", "杉並区", "豊島区",
-  "北区", "荒川区", "板橋区", "練馬区", "足立区", "葛飾区", "江戸川区",
-  "八王子市", "立川市", "武蔵野市", "三鷹市", "青梅市", "府中市", "昭島市",
-  "調布市", "町田市", "小金井市", "小平市", "日野市", "東村山市", "国分寺市",
-  "国立市", "福生市", "狛江市", "東大和市", "清瀬市", "東久留米市", "武蔵村山市",
-  "多摩市", "稲城市", "羽村市", "あきる野市", "西東京市"
-];
-
-// 常見町名
-export const towns = [
-  "本町", "栄町", "旭町", "錦町", "幸町", "緑町", "中央", "南町", "北町", "東町", "西町",
-  "桜町", "泉町", "住吉町", "平和町", "末広町", "昭和町", "大和町", "港町", "寿町",
-  "大手町", "丸の内", "霞が関", "永田町", "銀座", "日本橋", "六本木", "赤坂", "青山",
-  "渋谷", "原宿", "代官山", "恵比寿", "目黒", "自由が丘", "吉祥寺", "下北沢", "高円寺",
-  "中野", "池袋", "上野", "浅草", "秋葉原", "神田", "御茶ノ水", "水道橋", "飯田橋"
-];
-
-// 郵遞區號前綴對應（簡化版）
-const postalPrefixes: Record<string, string[]> = {
-  "北海道": ["00", "04", "05", "06", "07", "08", "09"],
-  "青森県": ["03"], "岩手県": ["02"], "宮城県": ["98"], "秋田県": ["01"],
-  "山形県": ["99"], "福島県": ["96", "97"], "茨城県": ["30", "31"],
-  "栃木県": ["32"], "群馬県": ["37"], "埼玉県": ["33", "34", "35", "36"],
-  "千葉県": ["26", "27", "28", "29"], "東京都": ["10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
-  "神奈川県": ["21", "22", "23", "24", "25"], "新潟県": ["94", "95"],
-  "富山県": ["93"], "石川県": ["92"], "福井県": ["91"], "山梨県": ["40"],
-  "長野県": ["38", "39"], "岐阜県": ["50"], "静岡県": ["41", "42", "43"],
-  "愛知県": ["44", "45", "46", "47", "48", "49"], "三重県": ["51"],
-  "滋賀県": ["52"], "京都府": ["60", "61", "62"], "大阪府": ["53", "54", "55", "56", "57", "58", "59"],
-  "兵庫県": ["65", "66", "67"], "奈良県": ["63"], "和歌山県": ["64"],
-  "鳥取県": ["68"], "島根県": ["69"], "岡山県": ["70", "71"],
-  "広島県": ["72", "73"], "山口県": ["74", "75"], "徳島県": ["77"],
-  "香川県": ["76"], "愛媛県": ["79"], "高知県": ["78"], "福岡県": ["80", "81", "82", "83"],
-  "佐賀県": ["84"], "長崎県": ["85"], "熊本県": ["86"], "大分県": ["87"],
-  "宮崎県": ["88"], "鹿児島県": ["89"], "沖縄県": ["90"]
-};
-
-// 隨機選擇陣列元素
-function getRandomElement<T>(array: T[]): T {
-  return array[Math.floor(Math.random() * array.length)];
+// 定義 JSON 資料結構
+interface TownData {
+  town: string;
+  zip: string;
 }
 
-// 生成隨機數字
-function getRandomNumber(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+interface CityData {
+  [key: string]: TownData[];
 }
 
-// 生成虛擬地址
-export interface JapaneseAddress {
+interface PrefectureData {
+  [key: string]: CityData;
+}
+
+// 強制轉型為正確的型別
+const realAddressData = realAddressDataRaw as unknown as PrefectureData;
+
+export interface Address {
   postalCode: string;
   prefecture: string;
   city: string;
   town: string;
-  block: string; // 番地
+  block: string;
   fullAddress: string;
 }
 
-export function generateAddress(): JapaneseAddress {
-  // 1. 隨機選擇都道府県
-  const prefecture = getRandomElement(prefectures);
+export function generateRandomAddress(): Address {
+  // 從真實資料中隨機選擇
+  const prefectures = Object.keys(realAddressData);
+  const prefecture = prefectures[Math.floor(Math.random() * prefectures.length)];
   
-  // 2. 隨機選擇市區町村（這裡做簡化，實際應用可能需要對應關係，但為了虛擬性，隨機組合也是一種策略）
-  // 為了讓地址看起來更真實，我們可以根據都道府県做一些簡單的過濾，或者直接使用通用的市區名
-  // 這裡為了簡化且確保虛擬性，我們隨機選擇一個市區名
-  const city = getRandomElement(cities);
+  const cities = Object.keys(realAddressData[prefecture as keyof typeof realAddressData]);
+  const city = cities[Math.floor(Math.random() * cities.length)];
   
-  // 3. 隨機選擇町名
-  const town = getRandomElement(towns);
+  const towns = realAddressData[prefecture as keyof typeof realAddressData][city as keyof typeof realAddressData[keyof typeof realAddressData]];
+  const selectedTownData = towns[Math.floor(Math.random() * towns.length)];
   
-  // 4. 生成番地和号
-  // 格式：X丁目Y番Z号 或 X-Y-Z
-  const chome = getRandomNumber(1, 9);
-  const banchi = getRandomNumber(1, 50);
-  const go = getRandomNumber(1, 30);
+  const town = selectedTownData.town;
+  const postalCode = selectedTownData.zip;
   
-  // 格式化番地：數字與日文間空一格
-  // 確保數字前後都有空格，例如 "9 丁目 25 番 20 号"
-  const block = `${chome} 丁目 ${banchi} 番 ${go} 号`;
+  // 生成隨機番地 (1-9 丁目, 1-50 番, 1-50 号)
+  // 為了增加真實感，有時候不一定有丁目
+  const hasChome = Math.random() > 0.3;
+  let block = "";
   
-  // 5. 生成郵遞區號
-  const prefixes = postalPrefixes[prefecture] || ["000"];
-  // 確保前綴為 3 碼，例如 "00" -> "000", "13" -> "130" (這裡假設前綴是前兩碼，需補第三碼，或直接使用三碼前綴)
-  // 根據原始資料 postalPrefixes 只有兩碼，日本郵遞區號前三碼代表區域
-  // 我們將隨機生成第三碼 (0-9) 來補足三碼格式
-  const prefixBase = getRandomElement(prefixes);
-  const prefixSuffix = getRandomNumber(0, 9).toString();
-  const prefix = (prefixBase + prefixSuffix).padEnd(3, '0').slice(0, 3);
+  if (hasChome) {
+    const chome = Math.floor(Math.random() * 9) + 1;
+    const ban = Math.floor(Math.random() * 50) + 1;
+    const go = Math.floor(Math.random() * 50) + 1;
+    block = `${chome} 丁目 ${ban} 番 ${go} 号`;
+  } else {
+    const ban = Math.floor(Math.random() * 1000) + 1;
+    const go = Math.floor(Math.random() * 50) + 1;
+    block = `${ban} 番地 ${go}`; // 有些地區是番地格式
+  }
   
-  const suffix = getRandomNumber(1, 9999).toString().padStart(4, '0');
-  const postalCode = `${prefix}-${suffix}`;
-  
-  // 6. 組合完整地址
-  // 確保町名與番地之間有空格，例如 "自由が丘 3 丁目"
+  // 組合完整地址，確保町名與番地間有空格
   const fullAddress = `${prefecture}${city}${town} ${block}`;
   
   return {

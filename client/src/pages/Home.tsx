@@ -1,18 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { generateAddress, type JapaneseAddress } from "@/lib/address-data";
+import { generateRandomAddress, type Address } from "@/lib/address-data";
 import { Copy, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Home() {
-  const [address, setAddress] = useState<JapaneseAddress>(generateAddress());
+  const [address, setAddress] = useState<Address>(generateRandomAddress());
   const [isAnimating, setIsAnimating] = useState(false);
 
   const handleGenerate = () => {
     setIsAnimating(true);
     setTimeout(() => {
-      setAddress(generateAddress());
+      setAddress(generateRandomAddress());
       setIsAnimating(false);
     }, 300); // Short delay for animation effect
   };
@@ -24,15 +24,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-0 opacity-10 overflow-hidden">
-        <div className="absolute top-4 right-4 md:top-10 md:right-10 text-6xl md:text-9xl font-serif writing-vertical-rl select-none whitespace-nowrap">
-          日本住所
-        </div>
-        <div className="absolute bottom-4 left-4 md:bottom-10 md:left-10 text-5xl md:text-8xl font-serif writing-vertical-rl select-none whitespace-nowrap">
-          仮想生成
-        </div>
-      </div>
+      {/* Decorative Background Elements - Removed as per user request */}
 
       <main className="w-full max-w-2xl z-10 relative">
         <div className="text-center mb-12 space-y-4">
@@ -147,7 +139,7 @@ export default function Home() {
               注意：本工具生成的地址均為虛擬數據，僅供測試與註冊使用，請勿用於非法用途。
             </p>
             <p className="text-xs text-muted-foreground">
-              ※ 郵遞區號前 3 碼為真實對應都道府県，後 4 碼為隨機生成，可通過大部分格式驗證。
+              ※ 郵遞區號、都道府県、市區町村、町名均為真實資料，僅番地號碼為虛擬生成。
             </p>
             <p className="text-xs text-muted-foreground pt-2">
               Copyright © <a 

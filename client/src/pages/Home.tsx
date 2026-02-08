@@ -31,8 +31,8 @@ export default function Home() {
           <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-widest text-primary">
             Virtual Japan Address Generator
           </h1>
-          <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed">
-            POSTAL CODE、都道府県、市区町村、町名均為真實資料，僅番地（包含丁目）為隨機生成的虛擬資訊。
+          <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed font-bold">
+            POSTAL CODE、都道府県、市区町村、町名均為真實資料，僅番地（包含丁目）為隨機生成的虛擬資訊
           </p>
         </div>
 
@@ -135,8 +135,8 @@ export default function Home() {
             重新生成
           </Button>
           <div className="mt-8 space-y-2">
-            <p className="text-xs text-muted-foreground">
-              請注意，本工具僅供示例與測試用途，請勿用於非法行為。
+            <p className="text-sm font-medium text-muted-foreground">
+              本工具僅供示例與測試用途，請勿用於非法行為
             </p>
             <p className="text-xs text-muted-foreground pt-2">
               Copyright © <a 

@@ -148,7 +148,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    background-image: url('/assets/clean-washi-bg.jpg');
+    background-image: url('https://files.manuscdn.com/user_upload_by_module/session_file/310519663217818186/DxzOqwSeaXqMIekQ.jpg');
     background-blend-mode: multiply;
     background-size: cover;
     background-attachment: fixed;

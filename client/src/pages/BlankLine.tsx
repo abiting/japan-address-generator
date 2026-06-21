@@ -55,7 +55,7 @@ const BLANK_CHARS: BlankChar[] = [
     nameEn: "Hair Space",
     unicode: "U+200A",
     char: "\u200A",
-    description: "極細的空格符號，比標籤空格更窄，多用於排版微調與製造隱形空行",
+    description: "極細的空格符號，比標籤空格、全形空格更窄，多用於排版微調",
     platforms: ["Facebook", "Twitter"],
     tip: "寬度極小，視覺上幾乎不可見，適合需要「最乾淨」空行效果的場合。",
   },

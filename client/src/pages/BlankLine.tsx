@@ -165,29 +165,6 @@ export default function BlankLine() {
           ))}
         </div>
 
-        {/* ── Usage Tips ── */}
-        <Card className="border border-primary/10 shadow-sm bg-card/60 backdrop-blur-sm mb-10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-serif tracking-wider flex items-center gap-2 text-muted-foreground">
-              <span className="w-1.5 h-6 bg-secondary rounded-sm inline-block"></span>
-              使用說明
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3 text-sm text-muted-foreground leading-relaxed">
-            <p>
-              在 Instagram 等平台撰文時，直接按 Enter 換行往往會被系統壓縮，無法保留空白行。
-              只需在空行處貼上本工具複製的不可見符號，即可讓平台「認為」該行有內容，進而保留段落間距。
-            </p>
-            <ol className="list-decimal list-inside space-y-1 pl-1">
-              <li>點擊上方任一符號卡片的「複製」按鈕。</li>
-              <li>在社群平台的發文框中，將游標移至需要空行的位置。</li>
-              <li>貼上（Ctrl+V 或 ⌘+V），該行即會成為視覺上的空白行。</li>
-              <li>若效果不如預期，可嘗試切換其他符號類型。</li>
-            </ol>
-
-          </CardContent>
-        </Card>
-
         {/* ── Footer ── */}
         <div className="text-center space-y-2 pb-4">
           <p className="text-sm font-medium text-muted-foreground">

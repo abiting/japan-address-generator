@@ -92,7 +92,7 @@ export default function BlankLine() {
             Blank Line Emoji Generator
           </h1>
           <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed font-bold">
-            複製不可見的空格（空白）字元，在 Instagram、Facebook 等不支援空行的社群平台製造段落分隔效果
+            複製不可見的空格（空白）字元，在 Facebook、Instagram 等不支援空行的社群平台製造段落分隔效果
           </p>
         </div>
 

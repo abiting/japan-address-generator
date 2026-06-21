@@ -62,7 +62,7 @@ const BLANK_CHARS: BlankChar[] = [
   {
     id: "zwsp",
     name: "零寬空格",
-    nameEn: "Zero Width Space",
+    nameEn: "Zero-Width Space",
     unicode: "U+200B",
     char: "\u200B",
     description: "零寬度的不可見符號，適合在不允許空白行的平台插入隱形分隔。",

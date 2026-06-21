@@ -167,9 +167,6 @@ export default function BlankLine() {
 
         {/* ── Footer ── */}
         <div className="text-center space-y-2 pb-4">
-          <p className="text-sm font-medium text-muted-foreground">
-            本工具僅供示例與測試用途，請勿用於非法行為
-          </p>
           <p className="text-xs text-muted-foreground pt-1">
             Copyright © <a
               href="https://abiting.cc"

@@ -35,7 +35,7 @@ const BLANK_CHARS: BlankChar[] = [
     unicode: "U+E0020",
     // actual Tag Space character
     char: "\u{E0020}",
-    description: "最常用的空行字元，在 Instagram、Facebook、Twitter/X 等平台均可製造空行效果。",
+    description: "最常用的空行字元，在 Instagram、Facebook、Twitter 等平台均可製造空行效果。",
     platforms: ["Facebook", "Instagram", "Threads", "Twitter"],
     tip: "貼上後，該行看起來完全空白，但實際上含有不可見字元，可讓平台保留段落間距。",
   },
@@ -92,7 +92,7 @@ export default function BlankLine() {
             Blank Line Emoji
           </h1>
           <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed font-bold">
-            複製不可見的「空白」字元，在 Instagram、Facebook 等不支援空行的社群平台製造段落分隔效果
+            複製不可見的空格（空白）字元，在 Instagram、Facebook 等不支援空行的社群平台製造段落分隔效果
           </p>
         </div>
 

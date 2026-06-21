@@ -35,9 +35,9 @@ const BLANK_CHARS: BlankChar[] = [
     unicode: "U+E0020",
     // actual Tag Space character
     char: "\u{E0020}",
-    description: "最常用的空行字元，在 Instagram、Facebook、Twitter 等平台均可製造空行效果。",
+    description: "最常用的空行符號，在 Instagram、Facebook、Twitter 等平台均可製造空行效果。",
     platforms: ["Facebook", "Instagram", "Threads", "Twitter"],
-    tip: "貼上後，該行看起來完全空白，但實際上含有不可見字元，可讓平台保留段落間距。",
+    tip: "貼上後，該行看起來完全空白，但實際上含有不可見符號，可讓平台保留段落間距。",
   },
   {
     id: "zwsp",
@@ -45,9 +45,9 @@ const BLANK_CHARS: BlankChar[] = [
     nameEn: "Zero Width Space",
     unicode: "U+200B",
     char: "\u200B",
-    description: "零寬度的不可見字元，適合在不允許空白行的平台插入隱形分隔。",
+    description: "零寬度的不可見符號，適合在不允許空白行的平台插入隱形分隔。",
     platforms: ["Instagram", "LINE", "Threads"],
-    tip: "部分平台會過濾此字元，若無效可改用「標籤空格」。",
+    tip: "部分平台會過濾此符號，若無效可改用「標籤空格」。",
   },
   {
     id: "ideographic-space",
@@ -57,7 +57,7 @@ const BLANK_CHARS: BlankChar[] = [
     char: "\u3000",
     description: "日文全形空格，寬度等同一個漢字，在許多東亞語系平台上可作為空行使用。",
     platforms: ["Facebook", "Instagram", "小紅書", "微博"],
-    tip: "視覺上佔有一個字元的寬度，若平台不接受不可見字元，可嘗試此選項。",
+    tip: "視覺上佔有一個符號的寬度，若平台不接受不可見符號，可嘗試此選項。",
   },
   {
     id: "hair-space",
@@ -65,7 +65,7 @@ const BLANK_CHARS: BlankChar[] = [
     nameEn: "Hair Space",
     unicode: "U+200A",
     char: "\u200A",
-    description: "極細的空白字元，比一般空格更窄，常用於排版微調與製造隱形空行。",
+    description: "極細的空白符號，比一般空格更窄，常用於排版微調與製造隱形空行。",
     platforms: ["Facebook", "Twitter"],
     tip: "寬度極小，視覺上幾乎不可見，適合需要「最乾淨」空行效果的場合。",
   },
@@ -92,7 +92,7 @@ export default function BlankLine() {
             Blank Line Emoji Generator
           </h1>
           <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed font-bold">
-            複製不可見的空格（空白）字元，在 Facebook、Instagram 等不支援空行的社群平台製造段落分隔效果
+            複製不可見的空格（空白）符號，在 Facebook、Instagram 等不支援空行的社群平台製造段落分隔效果
           </p>
         </div>
 
@@ -176,13 +176,13 @@ export default function BlankLine() {
           <CardContent className="pt-0 space-y-3 text-sm text-muted-foreground leading-relaxed">
             <p>
               在 Instagram 等平台撰文時，直接按 Enter 換行往往會被系統壓縮，無法保留空白行。
-              只需在空行處貼上本工具複製的不可見字元，即可讓平台「認為」該行有內容，進而保留段落間距。
+              只需在空行處貼上本工具複製的不可見符號，即可讓平台「認為」該行有內容，進而保留段落間距。
             </p>
             <ol className="list-decimal list-inside space-y-1 pl-1">
-              <li>點擊上方任一字元卡片的「複製」按鈕。</li>
+              <li>點擊上方任一符號卡片的「複製」按鈕。</li>
               <li>在社群平台的發文框中，將游標移至需要空行的位置。</li>
               <li>貼上（Ctrl+V 或 ⌘+V），該行即會成為視覺上的空白行。</li>
-              <li>若效果不如預期，可嘗試切換其他字元類型。</li>
+              <li>若效果不如預期，可嘗試切換其他符號類型。</li>
             </ol>
 
           </CardContent>

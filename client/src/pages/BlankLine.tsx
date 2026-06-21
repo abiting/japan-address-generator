@@ -30,7 +30,7 @@ interface BlankChar {
 const BLANK_CHARS: BlankChar[] = [
   {
     id: "tag-space",
-    name: "標籤空格",
+    name: "標簽空格",
     nameEn: "Tag Space",
     unicode: "U+E0020",
     // actual Tag Space character
@@ -38,16 +38,6 @@ const BLANK_CHARS: BlankChar[] = [
     description: "最常用的空行符號，在 Instagram、Facebook、Twitter 等平台均可製造空行效果。",
     platforms: ["Facebook", "Instagram", "Threads", "Twitter"],
     tip: "貼上後，該行看起來完全空白，但實際上含有不可見符號，可讓平台保留段落間距。",
-  },
-  {
-    id: "zwsp",
-    name: "零寬空格",
-    nameEn: "Zero Width Space",
-    unicode: "U+200B",
-    char: "\u200B",
-    description: "零寬度的不可見符號，適合在不允許空白行的平台插入隱形分隔。",
-    platforms: ["Instagram", "LINE", "Threads"],
-    tip: "部分平台會過濾此符號，若無效可改用「標籤空格」。",
   },
   {
     id: "ideographic-space",
@@ -68,6 +58,16 @@ const BLANK_CHARS: BlankChar[] = [
     description: "極細的空白符號，比一般空格更窄，常用於排版微調與製造隱形空行。",
     platforms: ["Facebook", "Twitter"],
     tip: "寬度極小，視覺上幾乎不可見，適合需要「最乾淨」空行效果的場合。",
+  },
+  {
+    id: "zwsp",
+    name: "零寬空格",
+    nameEn: "Zero Width Space",
+    unicode: "U+200B",
+    char: "\u200B",
+    description: "零寬度的不可見符號，適合在不允許空白行的平台插入隱形分隔。",
+    platforms: ["Instagram", "LINE", "Threads"],
+    tip: "部分平台會過濾此符號，若無效可改用「標簽空格」。",
   },
 ];
 

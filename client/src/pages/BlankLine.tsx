@@ -36,7 +36,7 @@ const BLANK_CHARS: BlankChar[] = [
     // actual Tag Space character
     char: "\u{E0020}",
     description: "最常用的空行字元，在 Instagram、Facebook、Twitter/X 等平台均可製造空行效果。",
-    platforms: ["Instagram", "Facebook", "Twitter / X", "Threads"],
+    platforms: ["Instagram", "Facebook", "Twitter", "Threads"],
     tip: "貼上後，該行看起來完全空白，但實際上含有不可見字元，可讓平台保留段落間距。",
   },
   {
@@ -66,7 +66,7 @@ const BLANK_CHARS: BlankChar[] = [
     unicode: "U+200A",
     char: "\u200A",
     description: "極細的空白字元，比一般空格更窄，常用於排版微調與製造隱形空行。",
-    platforms: ["Twitter / X", "Facebook"],
+    platforms: ["Twitter", "Facebook"],
     tip: "寬度極小，視覺上幾乎不可見，適合需要「最乾淨」空行效果的場合。",
   },
 ];

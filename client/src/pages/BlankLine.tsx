@@ -71,19 +71,13 @@ const BLANK_CHARS: BlankChar[] = [
   },
 ];
 
-// ── Multi-line builder ─────────────────────────────────────────────────────
-const DEFAULT_LINE_COUNT = 3;
-
 export default function BlankLine() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [lineCount, setLineCount] = useState(DEFAULT_LINE_COUNT);
-  const [selectedChar, setSelectedChar] = useState<BlankChar>(BLANK_CHARS[0]);
 
-  const copyChar = (char: BlankChar, count = 1) => {
-    const text = Array(count).fill(char.char).join("\n");
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedId(char.id + (count > 1 ? "-multi" : ""));
-      toast.success(`已複製 ${count > 1 ? `${count} 行` : ""}「${char.name}」`);
+  const copyChar = (char: BlankChar) => {
+    navigator.clipboard.writeText(char.char).then(() => {
+      setCopiedId(char.id);
+      toast.success(`已複製「${char.name}」`);
       setTimeout(() => setCopiedId(null), 2000);
     });
   };
@@ -107,12 +101,7 @@ export default function BlankLine() {
           {BLANK_CHARS.map((item) => (
             <Card
               key={item.id}
-              className={`border-2 transition-all duration-200 cursor-pointer shadow-md bg-card/80 backdrop-blur-sm ${
-                selectedChar.id === item.id
-                  ? "border-primary/60 shadow-primary/10 shadow-lg"
-                  : "border-primary/10 hover:border-primary/30"
-              }`}
-              onClick={() => setSelectedChar(item)}
+              className="border-2 border-primary/10 hover:border-primary/30 transition-all duration-200 shadow-md bg-card/80 backdrop-blur-sm"
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -163,85 +152,6 @@ export default function BlankLine() {
           ))}
         </div>
 
-        {/* ── Multi-line Builder ── */}
-        <Card className="border-2 border-primary/10 shadow-xl bg-card/80 backdrop-blur-sm mb-8">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <CardTitle className="text-xl font-serif tracking-wider flex items-center gap-2">
-              <span className="w-2 h-8 bg-primary rounded-sm inline-block"></span>
-              多行複製
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-5">
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              選擇字元後，設定要複製的行數，一次貼上多個空行，快速製造大段落間距。
-            </p>
-
-            {/* Selected char display */}
-            <div className="flex items-center gap-3 bg-secondary/10 rounded-lg p-4 border border-secondary/20">
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1 font-sans">
-                  目前選擇
-                </p>
-                <p className="font-serif font-bold text-primary">
-                  {selectedChar.name}
-                  <span className="ml-2 text-xs font-mono text-muted-foreground font-normal">
-                    {selectedChar.unicode}
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            {/* Line count selector */}
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-sans">
-                行數：{lineCount} 行
-              </p>
-              <div className="flex gap-2 flex-wrap">
-                {[1, 2, 3, 5, 8, 10].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setLineCount(n)}
-                    className={`px-4 py-1.5 rounded-full text-sm font-sans transition-all duration-150 border ${
-                      lineCount === n
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-transparent text-muted-foreground border-border hover:border-primary/40"
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Preview area */}
-            <div className="bg-muted/30 rounded-lg border border-border p-4 min-h-[80px] flex flex-col justify-center">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2 font-sans">
-                預覽（不可見字元以 · 示意）
-              </p>
-              <div className="font-mono text-sm text-foreground/60 space-y-0.5">
-                {Array(lineCount).fill(null).map((_, i) => (
-                  <div key={i} className="flex items-center gap-1">
-                    <span className="text-primary/40 text-xs">·</span>
-                    <span className="text-[10px] text-muted-foreground/50">{selectedChar.unicode}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              size="lg"
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif tracking-widest rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-              onClick={() => copyChar(selectedChar, lineCount)}
-            >
-              {copiedId === selectedChar.id + "-multi" ? (
-                <><Check className="h-5 w-5 mr-2" />已複製 {lineCount} 行</>
-              ) : (
-                <><Copy className="h-5 w-5 mr-2" />複製 {lineCount} 行空行</>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-
         {/* ── Usage Tips ── */}
         <Card className="border border-primary/10 shadow-sm bg-card/60 backdrop-blur-sm mb-10">
           <CardHeader className="pb-3">
@@ -261,9 +171,7 @@ export default function BlankLine() {
               <li>貼上（Ctrl+V 或 ⌘+V），該行即會成為視覺上的空白行。</li>
               <li>若效果不如預期，可嘗試切換其他字元類型。</li>
             </ol>
-            <p className="text-xs pt-1">
-              {selectedChar.tip}
-            </p>
+
           </CardContent>
         </Card>
 

@@ -98,10 +98,18 @@ export default function BlankLine() {
 
         {/* ── Character Cards ── */}
         <div className="space-y-4 mb-8">
-          {BLANK_CHARS.map((item) => (
+          {BLANK_CHARS.map((item, index) => (
             <Card
               key={item.id}
-              className="border-2 border-primary/10 hover:border-primary/30 transition-all duration-200 shadow-md bg-card/80 backdrop-blur-sm"
+              className={`border-2 transition-all duration-200 shadow-md bg-card/80 backdrop-blur-sm ${
+                index === 0
+                  ? "border-[#9b72cf] shadow-[0_0_0_1px_#c9a8f0,0_4px_24px_rgba(155,114,207,0.25)] hover:shadow-[0_0_0_1px_#d4b8f8,0_6px_32px_rgba(155,114,207,0.35)]"
+                  : "border-primary/10 hover:border-primary/30"
+              }`}
+              style={index === 0 ? {
+                borderImage: "linear-gradient(135deg, #c9a8f0, #7c4dbd, #e0c8ff, #9b72cf) 1",
+                borderImageSlice: 1,
+              } : undefined}
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -110,6 +118,11 @@ export default function BlankLine() {
                       <span className="font-serif font-bold text-lg text-primary">
                         {item.name}
                       </span>
+                      {index === 0 && (
+                        <span className="text-[10px] font-sans font-bold px-2 py-0.5 rounded-full" style={{ background: "linear-gradient(135deg, #c9a8f0, #7c4dbd)", color: "#fff", letterSpacing: "0.08em" }}>
+                          最常用
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground font-sans tracking-widest uppercase">
                         {item.nameEn}
                       </span>

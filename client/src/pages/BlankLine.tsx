@@ -23,7 +23,6 @@ interface BlankChar {
   unicode: string;
   char: string;
   description: string;
-  platforms: string[];
   tip: string;
 }
 
@@ -36,7 +35,6 @@ const BLANK_CHARS: BlankChar[] = [
     // actual Tag Space character
     char: "\u{E0020}",
     description: "最常用的空格符號，在 Instagram、Facebook、Twitter 等平台均可製造空行效果",
-    platforms: ["Facebook", "Instagram", "Threads", "Twitter"],
     tip: "貼上後，該行看起來完全空白，但實際上含有不可見符號，可讓平台保留段落間距。",
   },
   {
@@ -46,7 +44,6 @@ const BLANK_CHARS: BlankChar[] = [
     unicode: "U+3000",
     char: "\u3000",
     description: "日文全形空格，寬度等同一個漢字，在許多東亞語系平台上可作為空行使用",
-    platforms: ["Facebook", "Instagram", "小紅書", "微博"],
     tip: "視覺上佔有一個符號的寬度，若平台不接受不可見符號，可嘗試此選項。",
   },
   {
@@ -56,7 +53,6 @@ const BLANK_CHARS: BlankChar[] = [
     unicode: "U+200A",
     char: "\u200A",
     description: "極細的空格符號，比標籤空格、全形空格更窄，多用於排版微調",
-    platforms: ["Facebook", "Twitter"],
     tip: "寬度極小，視覺上幾乎不可見，適合需要「最乾淨」空行效果的場合。",
   },
   {
@@ -66,7 +62,6 @@ const BLANK_CHARS: BlankChar[] = [
     unicode: "U+200B",
     char: "\u200B",
     description: "零寬度的不可見符號，適合在嚴格禁止空行的平台插入隱形分隔",
-    platforms: ["Instagram", "LINE", "Threads"],
     tip: "部分平台會過濾此符號，若無效可改用「標簽空格」。",
   },
 ];
@@ -130,19 +125,9 @@ export default function BlankLine() {
                         {item.unicode}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-2">
+                    <p className="text-base text-muted-foreground leading-relaxed">
                       {item.description}
                     </p>
-                    <div className="flex flex-wrap gap-1">
-                      {item.platforms.map((p) => (
-                        <span
-                          key={p}
-                          className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-sans"
-                        >
-                          {p}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                   <Button
                     variant={copiedId === item.id ? "default" : "outline"}

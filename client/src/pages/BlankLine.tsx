@@ -1,0 +1,289 @@
+/**
+ * Blank Line Emoji Tool — 空行 Emoji 複製工具
+ * Design: Japanese Minimalist Zen (same as Home.tsx)
+ * Font: Zen Maru Gothic + Noto Sans TC
+ * Color: Aizome (Indigo) primary, Washi Paper background
+ *
+ * Purpose: Let users copy invisible "blank line" characters (U+E0020 Tag Space,
+ * U+200B Zero Width Space, U+3000 Ideographic Space, etc.) to create visual
+ * paragraph breaks in social platforms that strip normal blank lines.
+ */
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Copy, Check } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+// ── Character definitions ──────────────────────────────────────────────────
+interface BlankChar {
+  id: string;
+  name: string;
+  nameEn: string;
+  unicode: string;
+  char: string;
+  description: string;
+  platforms: string[];
+  tip: string;
+}
+
+const BLANK_CHARS: BlankChar[] = [
+  {
+    id: "tag-space",
+    name: "標籤空格",
+    nameEn: "Tag Space",
+    unicode: "U+E0020",
+    // actual Tag Space character
+    char: "\u{E0020}",
+    description: "最常用的空行字元，在 Instagram、Facebook、Twitter/X 等平台均可製造空行效果。",
+    platforms: ["Instagram", "Facebook", "Twitter / X", "Threads"],
+    tip: "貼上後，該行看起來完全空白，但實際上含有不可見字元，可讓平台保留段落間距。",
+  },
+  {
+    id: "zwsp",
+    name: "零寬空格",
+    nameEn: "Zero Width Space",
+    unicode: "U+200B",
+    char: "\u200B",
+    description: "零寬度的不可見字元，適合在不允許空白行的平台插入隱形分隔。",
+    platforms: ["Instagram", "Threads", "LINE"],
+    tip: "部分平台會過濾此字元，若無效可改用「標籤空格」。",
+  },
+  {
+    id: "ideographic-space",
+    name: "全形空格",
+    nameEn: "Ideographic Space",
+    unicode: "U+3000",
+    char: "\u3000",
+    description: "日文全形空格，寬度等同一個漢字，在許多東亞語系平台上可作為空行使用。",
+    platforms: ["Instagram", "Facebook", "微博", "小紅書"],
+    tip: "視覺上佔有一個字元的寬度，若平台不接受不可見字元，可嘗試此選項。",
+  },
+  {
+    id: "hair-space",
+    name: "髮絲空格",
+    nameEn: "Hair Space",
+    unicode: "U+200A",
+    char: "\u200A",
+    description: "極細的空白字元，比一般空格更窄，常用於排版微調與製造隱形空行。",
+    platforms: ["Twitter / X", "Facebook"],
+    tip: "寬度極小，視覺上幾乎不可見，適合需要「最乾淨」空行效果的場合。",
+  },
+];
+
+// ── Multi-line builder ─────────────────────────────────────────────────────
+const DEFAULT_LINE_COUNT = 3;
+
+export default function BlankLine() {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [lineCount, setLineCount] = useState(DEFAULT_LINE_COUNT);
+  const [selectedChar, setSelectedChar] = useState<BlankChar>(BLANK_CHARS[0]);
+
+  const copyChar = (char: BlankChar, count = 1) => {
+    const text = Array(count).fill(char.char).join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(char.id + (count > 1 ? "-multi" : ""));
+      toast.success(`已複製 ${count > 1 ? `${count} 行` : ""}「${char.name}」`);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <main className="w-full max-w-2xl z-10 relative">
+
+        {/* ── Header ── */}
+        <div className="text-center mb-10 space-y-3">
+          <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-widest text-primary">
+            Blank Line Emoji
+          </h1>
+          <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed font-bold">
+            複製不可見字元，在 Instagram、Facebook 等不支援空行的社群平台製造段落分隔效果
+          </p>
+        </div>
+
+        {/* ── Character Cards ── */}
+        <div className="space-y-4 mb-8">
+          {BLANK_CHARS.map((item) => (
+            <Card
+              key={item.id}
+              className={`border-2 transition-all duration-200 cursor-pointer shadow-md bg-card/80 backdrop-blur-sm ${
+                selectedChar.id === item.id
+                  ? "border-primary/60 shadow-primary/10 shadow-lg"
+                  : "border-primary/10 hover:border-primary/30"
+              }`}
+              onClick={() => setSelectedChar(item)}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="font-serif font-bold text-lg text-primary">
+                        {item.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-sans tracking-widest uppercase">
+                        {item.nameEn}
+                      </span>
+                      <span className="text-xs bg-secondary/20 text-secondary-foreground px-2 py-0.5 rounded font-mono">
+                        {item.unicode}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-2">
+                      {item.description}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {item.platforms.map((p) => (
+                        <span
+                          key={p}
+                          className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-sans"
+                        >
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <Button
+                    variant={copiedId === item.id ? "default" : "outline"}
+                    size="sm"
+                    className="shrink-0 font-sans tracking-wide transition-all duration-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyChar(item);
+                    }}
+                  >
+                    {copiedId === item.id ? (
+                      <><Check className="h-3.5 w-3.5 mr-1.5" />已複製</>
+                    ) : (
+                      <><Copy className="h-3.5 w-3.5 mr-1.5" />複製</>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* ── Multi-line Builder ── */}
+        <Card className="border-2 border-primary/10 shadow-xl bg-card/80 backdrop-blur-sm mb-8">
+          <CardHeader className="border-b border-border/50 pb-4">
+            <CardTitle className="text-xl font-serif tracking-wider flex items-center gap-2">
+              <span className="w-2 h-8 bg-primary rounded-sm inline-block"></span>
+              多行複製
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-5">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              選擇字元後，設定要複製的行數，一次貼上多個空行，快速製造大段落間距。
+            </p>
+
+            {/* Selected char display */}
+            <div className="flex items-center gap-3 bg-secondary/10 rounded-lg p-4 border border-secondary/20">
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1 font-sans">
+                  目前選擇
+                </p>
+                <p className="font-serif font-bold text-primary">
+                  {selectedChar.name}
+                  <span className="ml-2 text-xs font-mono text-muted-foreground font-normal">
+                    {selectedChar.unicode}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {/* Line count selector */}
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground uppercase tracking-widest font-sans">
+                行數：{lineCount} 行
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                {[1, 2, 3, 5, 8, 10].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setLineCount(n)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-sans transition-all duration-150 border ${
+                      lineCount === n
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-transparent text-muted-foreground border-border hover:border-primary/40"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Preview area */}
+            <div className="bg-muted/30 rounded-lg border border-border p-4 min-h-[80px] flex flex-col justify-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2 font-sans">
+                預覽（不可見字元以 · 示意）
+              </p>
+              <div className="font-mono text-sm text-foreground/60 space-y-0.5">
+                {Array(lineCount).fill(null).map((_, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <span className="text-primary/40 text-xs">·</span>
+                    <span className="text-[10px] text-muted-foreground/50">{selectedChar.unicode}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              size="lg"
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-serif tracking-widest rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+              onClick={() => copyChar(selectedChar, lineCount)}
+            >
+              {copiedId === selectedChar.id + "-multi" ? (
+                <><Check className="h-5 w-5 mr-2" />已複製 {lineCount} 行</>
+              ) : (
+                <><Copy className="h-5 w-5 mr-2" />複製 {lineCount} 行空行</>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ── Usage Tips ── */}
+        <Card className="border border-primary/10 shadow-sm bg-card/60 backdrop-blur-sm mb-10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-serif tracking-wider flex items-center gap-2 text-muted-foreground">
+              <span className="w-1.5 h-6 bg-secondary rounded-sm inline-block"></span>
+              使用說明
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3 text-sm text-muted-foreground leading-relaxed">
+            <p>
+              在 Instagram 等平台撰文時，直接按 Enter 換行往往會被系統壓縮，無法保留空白行。
+              只需在空行處貼上本工具複製的不可見字元，即可讓平台「認為」該行有內容，進而保留段落間距。
+            </p>
+            <ol className="list-decimal list-inside space-y-1 pl-1">
+              <li>點擊上方任一字元卡片的「複製」按鈕。</li>
+              <li>在社群平台的發文框中，將游標移至需要空行的位置。</li>
+              <li>貼上（Ctrl+V 或 ⌘+V），該行即會成為視覺上的空白行。</li>
+              <li>若效果不如預期，可嘗試切換其他字元類型。</li>
+            </ol>
+            <p className="text-xs pt-1">
+              {selectedChar.tip}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* ── Footer ── */}
+        <div className="text-center space-y-2 pb-4">
+          <p className="text-sm font-medium text-muted-foreground">
+            本工具僅供示例與測試用途，請勿用於非法行為
+          </p>
+          <p className="text-xs text-muted-foreground pt-1">
+            Copyright © <a
+              href="https://abiting.cc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors underline decoration-dotted underline-offset-4"
+            >
+              阿比丁的第二個家
+            </a>
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}

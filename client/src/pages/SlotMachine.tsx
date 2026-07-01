@@ -1,5 +1,5 @@
 // Slot Machine — Detective Conan Edition
-// Key fix: cumulative px (no modulo during spin) → precise snap to targetIndex
+// Rewrite v3: CSS transition-based snap for pixel-perfect stop + instant full speed
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
@@ -7,7 +7,7 @@ const CHARS = [
   "/manus-storage/char_01_22802bad.png", // 0: 柯南
   "/manus-storage/char_02_defeba6e.png", // 1: 灰原哀
   "/manus-storage/char_03_cf9da978.png",
-  "/manus-storage/char_04_f6244eb9.png",
+  "/manus-storage/char_04_99a8e9d5.png",
   "/manus-storage/char_05_0bb16693.png",
   "/manus-storage/char_06_ea6d16a8.png",
   "/manus-storage/char_07_c6f0c306.png",
@@ -35,9 +35,19 @@ const CHARS = [
   "/manus-storage/char_30_fd8923f7.png",
 ];
 
-const N = CHARS.length; // 28
+const N = CHARS.length; // 29
 const CONAN_IDX = 0;
 const HAIBARA_IDX = 1;
+
+// Strip layout: we render 3 copies of the full list.
+// Copy 0: indices 0..N-1
+// Copy 1: indices N..2N-1   ← we spin INTO this copy
+// Copy 2: indices 2N..3N-1
+// During spin we animate translateY at constant speed using RAF.
+// When stop is triggered we compute the exact px for targetIndex in copy 1 (or 2),
+// then use a CSS cubic-bezier transition to snap there precisely.
+const COPIES = 3;
+const TOTAL = N * COPIES;
 
 function getResult(r: [number, number, number]): { msg: string; color: string } {
   const [a, b, c] = r;
@@ -50,120 +60,116 @@ function getResult(r: [number, number, number]): { msg: string; color: string } 
   return { msg: "再接再厲！", color: "#ffaaaa" };
 }
 
-// ─── Reel ─────────────────────────────────────────────────────────────────────
-// The strip renders REPS * N cells. We track cumulative px (never modulo'd during
-// animation) so the snap target is always a clean integer multiple of cellH.
-const REPS = 8; // enough repetitions so we never run out of strip
-
 interface ReelProps {
   spinning: boolean;
   targetIndex: number;
-  stopDelay: number;
+  stopDelay: number;   // ms after spin starts to begin decel
   onStopped: () => void;
 }
 
 function Reel({ spinning, targetIndex, stopDelay, onStopped }: ReelProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
-  const cellHRef = useRef(0);
   const rafRef = useRef(0);
-
-  // Animation state kept in refs to avoid stale closures
-  const phaseRef = useRef<"idle" | "fast" | "decel" | "done">("idle");
   const startTimeRef = useRef(0);
-  const decelStartPxRef = useRef(0);
-  const decelStartTimeRef = useRef(0);
-  const decelDistPxRef = useRef(0);
-  const cumulativePxRef = useRef(0); // never reset during a spin
-  const firedRef = useRef(false);
+  const currentPxRef = useRef(0);   // current translateY magnitude (positive = scrolled down)
+  const stoppedRef = useRef(false);
+  const cellHRef = useRef(0);
 
-  // Measure cell height via ResizeObserver (cell = wrapper, since aspect-ratio 1:1)
+  // Measure cell height
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => { cellHRef.current = el.clientHeight; });
+    const update = () => { cellHRef.current = el.clientHeight; };
+    update();
+    const ro = new ResizeObserver(update);
     ro.observe(el);
-    cellHRef.current = el.clientHeight;
     return () => ro.disconnect();
   }, []);
 
-  const applyTranslate = (px: number) => {
-    if (!stripRef.current) return;
-    // Wrap visually so the strip doesn't scroll past its end
-    const totalH = cellHRef.current * N * REPS;
-    const visual = px % totalH;
-    stripRef.current.style.transform = `translateY(${-visual}px)`;
+  const setTranslate = (px: number, transition = "none") => {
+    const el = stripRef.current;
+    if (!el) return;
+    el.style.transition = transition;
+    el.style.transform = `translateY(${-px}px)`;
   };
 
   useEffect(() => {
     if (!spinning) {
       cancelAnimationFrame(rafRef.current);
-      phaseRef.current = "idle";
-      firedRef.current = false;
+      // Reset strip to top (copy 0, index 0) instantly
+      currentPxRef.current = 0;
+      stoppedRef.current = false;
+      setTranslate(0);
       return;
     }
 
-    // Reset for new spin
-    cumulativePxRef.current = 0;
-    firedRef.current = false;
-    phaseRef.current = "fast";
-    startTimeRef.current = performance.now();
+    // ── Start: position strip so copy 0 is visible (px=0 shows index 0 of copy 0)
+    // We'll spin downward, so translateY goes increasingly negative (px increases).
+    // Start at px = 0 (top of strip).
+    currentPxRef.current = 0;
+    stoppedRef.current = false;
+    setTranslate(0);
 
-    const FAST_PX_MS = 1.2;   // px per ms — constant full speed
-    const DECEL_MS   = 900;   // deceleration duration
+    const SPEED = 1.4; // px per ms — fast from frame 1
+    startTimeRef.current = performance.now();
     let lastTime = performance.now();
 
     const loop = (now: number) => {
       const cellH = cellHRef.current;
       if (cellH <= 0) { lastTime = now; rafRef.current = requestAnimationFrame(loop); return; }
 
+      const elapsed = now - startTimeRef.current;
       const dt = now - lastTime;
       lastTime = now;
-      const elapsed = now - startTimeRef.current;
 
-      if (phaseRef.current === "fast") {
-        // Advance by fixed delta each frame — starts at full speed immediately
-        cumulativePxRef.current += dt * FAST_PX_MS;
-        applyTranslate(cumulativePxRef.current);
+      if (!stoppedRef.current) {
+        // Advance at constant speed
+        currentPxRef.current += dt * SPEED;
 
-        if (elapsed >= stopDelay) {
-          phaseRef.current = "decel";
-          decelStartPxRef.current = cumulativePxRef.current;
-          decelStartTimeRef.current = now;
-
-          // How many full cells have we scrolled past?
-          const scrolledCells = cumulativePxRef.current / cellH; // fractional
-          // We want to land on targetIndex.
-          // The strip repeats every N cells. Find next occurrence of targetIndex
-          // that is at least MIN_EXTRA cells ahead.
-          const MIN_EXTRA = 3;
-          const fractionalPos = scrolledCells % N;
-          let cellsToTarget = (targetIndex - fractionalPos + N) % N;
-          if (cellsToTarget < MIN_EXTRA) cellsToTarget += N;
-          // Add 2 full loops for visual richness
-          cellsToTarget += N * 2;
-
-          decelDistPxRef.current = cellsToTarget * cellH;
+        // Visual wrap: keep within strip bounds to avoid blank space
+        const totalH = cellH * TOTAL;
+        if (currentPxRef.current >= totalH - cellH * N) {
+          // Jump back by N cells (one full copy) — seamless because strip repeats
+          currentPxRef.current -= cellH * N;
         }
-      } else if (phaseRef.current === "decel") {
-        const dt = now - decelStartTimeRef.current;
-        const t = Math.min(dt / DECEL_MS, 1);
-        // Ease-out cubic
-        const eased = 1 - Math.pow(1 - t, 3);
-        const px = decelStartPxRef.current + eased * decelDistPxRef.current;
-        cumulativePxRef.current = px;
-        applyTranslate(px);
 
-        if (t >= 1) {
-          // Final snap: the exact target position
-          const finalPx = decelStartPxRef.current + decelDistPxRef.current;
-          // Snap to nearest cell boundary (should already be exact, but round for safety)
-          const snapped = Math.round(finalPx / cellH) * cellH;
-          cumulativePxRef.current = snapped;
-          applyTranslate(snapped);
-          phaseRef.current = "done";
-          if (!firedRef.current) { firedRef.current = true; onStopped(); }
-          return;
+        setTranslate(currentPxRef.current);
+
+        // Time to stop?
+        if (elapsed >= stopDelay) {
+          stoppedRef.current = true;
+
+          // Compute snap target: we want to show targetIndex.
+          // Pick copy 1 (offset = N * cellH) as the landing zone — it's always
+          // reachable since we've been spinning and wrapping within copy 0/1.
+          // Find the nearest occurrence of targetIndex at or ahead of currentPxRef.
+          const targetPxInCopy1 = (N + targetIndex) * cellH;
+
+          // We need targetPx > currentPxRef so we always scroll forward.
+          // If copy 1 is already behind us, use copy 2.
+          let snapPx = targetPxInCopy1;
+          if (snapPx <= currentPxRef.current + cellH * 2) {
+            snapPx = (N * 2 + targetIndex) * cellH;
+          }
+
+          // Decel distance must be at least 2 full loops for visual richness
+          const minExtra = cellH * N * 1; // at least 1 extra loop
+          if (snapPx < currentPxRef.current + minExtra) {
+            snapPx += cellH * N;
+          }
+
+          const decelMs = 900;
+          setTranslate(snapPx, `transform ${decelMs}ms cubic-bezier(0.25, 0.1, 0.25, 1.0)`);
+          currentPxRef.current = snapPx;
+
+          setTimeout(() => {
+            // After transition ends, hard-set to exact pixel (no drift)
+            setTranslate(snapPx, "none");
+            onStopped();
+          }, decelMs + 50);
+
+          return; // stop RAF
         }
       }
 
@@ -172,9 +178,10 @@ function Reel({ spinning, targetIndex, stopDelay, onStopped }: ReelProps) {
 
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [spinning, targetIndex, stopDelay, onStopped]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spinning, targetIndex, stopDelay]);
 
-  const cells = Array.from({ length: N * REPS }, (_, i) => CHARS[i % N]);
+  const cells = Array.from({ length: TOTAL }, (_, i) => CHARS[i % N]);
 
   return (
     <div
@@ -203,7 +210,7 @@ function Reel({ spinning, targetIndex, stopDelay, onStopped }: ReelProps) {
           <div key={i} style={{
             flexShrink: 0, width: "100%", aspectRatio: "1 / 1",
             display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "6% 8% 10% 8%", boxSizing: "border-box",
+            padding: "8%", boxSizing: "border-box",
           }}>
             <img src={src} alt="character" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           </div>
@@ -261,7 +268,8 @@ export default function SlotMachine() {
     if (gameState === "result") setResult(getResult(finals));
   }, [gameState, finals]);
 
-  const stopDelays = [900, 1600, 2300];
+  // Stop delays: reel 0 stops first, then 1, then 2
+  const stopDelays = [800, 1500, 2200];
 
   return (
     <div style={{

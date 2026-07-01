@@ -1,147 +1,163 @@
 // Slot Machine — Detective Conan Edition
-// Design: Compact square layout optimized for iframe embedding
-// Style: Casino red/gold with vertical scroll reel animation (RAF-based, snaps to cell)
+// Key fix: cumulative px (no modulo during spin) → precise snap to targetIndex
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
 const CHARS = [
-  "/manus-storage/char_01_5bc55a42.png",
-  "/manus-storage/char_02_046a8223.png",
-  "/manus-storage/char_03_8a1ac675.png",
-  "/manus-storage/char_04_2d368c32.png",
-  "/manus-storage/char_05_3364444c.png",
-  "/manus-storage/char_06_0fbe9a6e.png",
-  "/manus-storage/char_07_2d71ff07.png",
-  "/manus-storage/char_08_56093021.png",
-  "/manus-storage/char_09_e5b0c803.png",
-  "/manus-storage/char_10_540ac6fb.png",
-  "/manus-storage/char_11_04eee064.png",
-  "/manus-storage/char_12_906503ca.png",
-  "/manus-storage/char_13_19bbbebb.png",
-  "/manus-storage/char_14_9c6eb733.png",
-  "/manus-storage/char_15_eb187663.png",
-  "/manus-storage/char_16_8e52df9d.png",
-  "/manus-storage/char_17_24ed65fd.png",
-  "/manus-storage/char_18_6c2a7c2b.png",
-  "/manus-storage/char_19_7f8bbc49.png",
-  "/manus-storage/char_20_f6748cc7.png",
-  "/manus-storage/char_21_ebce64cd.png",
-  "/manus-storage/char_22_386ce831.png",
-  "/manus-storage/char_23_b27aef62.png",
-  "/manus-storage/char_24_a56bc81e.png",
-  "/manus-storage/char_25_07d4ba92.png",
-  "/manus-storage/char_26_798ca2f8.png",
-  "/manus-storage/char_27_8abd546f.png",
-  "/manus-storage/char_28_ce9ac3e7.png",
-  "/manus-storage/char_29_3685c44f.png",
+  "/manus-storage/char_01_33dac3d4.png", // 0: 柯南
+  "/manus-storage/char_02_d4584850.png", // 1: 灰原哀
+  "/manus-storage/char_03_07d9a06f.png",
+  "/manus-storage/char_04_4165b050.png",
+  "/manus-storage/char_05_be69ca1c.png",
+  "/manus-storage/char_06_f13c70c8.png",
+  "/manus-storage/char_07_11a54e12.png",
+  "/manus-storage/char_08_198aca11.png",
+  "/manus-storage/char_09_16b8b72c.png",
+  "/manus-storage/char_10_25d5aa55.png",
+  "/manus-storage/char_11_dc466816.png",
+  "/manus-storage/char_12_e0bda61d.png",
+  "/manus-storage/char_13_e5f7d8de.png",
+  "/manus-storage/char_14_fd247f49.png",
+  "/manus-storage/char_15_3c87881a.png",
+  "/manus-storage/char_16_4b6e6bb3.png",
+  "/manus-storage/char_17_09794325.png",
+  "/manus-storage/char_18_d04eaf3e.png",
+  "/manus-storage/char_19_df56d9ac.png",
+  "/manus-storage/char_20_71431944.png",
+  "/manus-storage/char_21_4a4289fb.png",
+  "/manus-storage/char_22_c2e72d2a.png",
+  "/manus-storage/char_23_ca614bcc.png",
+  "/manus-storage/char_24_32d5dbe4.png",
+  "/manus-storage/char_26_94016d92.png",
+  "/manus-storage/char_27_a2d6ba4d.png",
+  "/manus-storage/char_28_8ac90b5a.png",
+  "/manus-storage/char_29_c8fb8b34.png",
 ];
 
-const N = CHARS.length; // 29
+const N = CHARS.length; // 28
+const CONAN_IDX = 0;
+const HAIBARA_IDX = 1;
 
-// Reel: uses requestAnimationFrame for precise cell-snapped scrolling
-function Reel({
-  spinning,
-  targetIndex,
-  stopDelay,
-  onStopped,
-}: {
+function getResult(r: [number, number, number]): { msg: string; color: string } {
+  const [a, b, c] = r;
+  if (a === b && b === c) return { msg: "🎉 恭喜中獎！", color: "#ffd700" };
+  const conanCount = r.filter((x) => x === CONAN_IDX).length;
+  const haibaraCount = r.filter((x) => x === HAIBARA_IDX).length;
+  if ((conanCount === 2 && haibaraCount === 1) || (conanCount === 1 && haibaraCount === 2))
+    return { msg: "💕 柯哀好嗑！", color: "#ffb3d9" };
+  if (a === b || b === c || a === c) return { msg: "✨ 運氣不錯！", color: "#90ee90" };
+  return { msg: "再接再厲！", color: "#ffaaaa" };
+}
+
+// ─── Reel ─────────────────────────────────────────────────────────────────────
+// The strip renders REPS * N cells. We track cumulative px (never modulo'd during
+// animation) so the snap target is always a clean integer multiple of cellH.
+const REPS = 8; // enough repetitions so we never run out of strip
+
+interface ReelProps {
   spinning: boolean;
   targetIndex: number;
-  stopDelay: number; // ms before this reel starts decelerating
+  stopDelay: number;
   onStopped: () => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  // offsetIndex: which cell is currently at the top of the visible window
-  const offsetRef = useRef(0); // float, in cell units
-  const rafRef = useRef<number>(0);
-  const startTimeRef = useRef<number>(0);
+}
+
+function Reel({ spinning, targetIndex, stopDelay, onStopped }: ReelProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const cellHRef = useRef(0);
+  const rafRef = useRef(0);
+
+  // Animation state kept in refs to avoid stale closures
   const phaseRef = useRef<"idle" | "fast" | "decel" | "done">("idle");
-  const stoppedFiredRef = useRef(false);
+  const startTimeRef = useRef(0);
+  const decelStartPxRef = useRef(0);
+  const decelStartTimeRef = useRef(0);
+  const decelDistPxRef = useRef(0);
+  const cumulativePxRef = useRef(0); // never reset during a spin
+  const firedRef = useRef(false);
 
-  // Build a virtual strip: we render N*3 cells and wrap via modulo
-  const VISIBLE = 3; // cells visible in strip (top, center, bottom)
-  const STRIP_SIZE = N * 3;
-
-  const getY = (offset: number, cellPx: number) => {
-    // offset is in cell units; we want the center cell to show targetIndex
-    // translateY moves strip up
-    return -offset * cellPx;
-  };
-
-  const applyTransform = useCallback((offset: number) => {
-    const el = containerRef.current;
+  // Measure cell height via ResizeObserver (cell = wrapper, since aspect-ratio 1:1)
+  useEffect(() => {
+    const el = wrapperRef.current;
     if (!el) return;
-    const cellPx = el.parentElement!.clientHeight;
-    el.style.transform = `translateY(${getY(offset, cellPx)}px)`;
+    const ro = new ResizeObserver(() => { cellHRef.current = el.clientHeight; });
+    ro.observe(el);
+    cellHRef.current = el.clientHeight;
+    return () => ro.disconnect();
   }, []);
+
+  const applyTranslate = (px: number) => {
+    if (!stripRef.current) return;
+    // Wrap visually so the strip doesn't scroll past its end
+    const totalH = cellHRef.current * N * REPS;
+    const visual = px % totalH;
+    stripRef.current.style.transform = `translateY(${-visual}px)`;
+  };
 
   useEffect(() => {
     if (!spinning) {
       cancelAnimationFrame(rafRef.current);
       phaseRef.current = "idle";
-      stoppedFiredRef.current = false;
+      firedRef.current = false;
       return;
     }
 
-    stoppedFiredRef.current = false;
+    // Reset for new spin
+    cumulativePxRef.current = 0;
+    firedRef.current = false;
     phaseRef.current = "fast";
     startTimeRef.current = performance.now();
 
-    // Speed: cells per ms
-    const FAST_SPEED = 0.025; // cells/ms
-    const DECEL_DURATION = 700; // ms to decelerate
-
-    // We want to land on targetIndex exactly.
-    // After stopDelay ms of fast spin, we decelerate to land on targetIndex.
-    // We compute how many full loops + targetIndex offset to travel.
-
-    let decelStartOffset = 0;
-    let decelStartTime = 0;
-    let totalDecelDistance = 0;
+    const FAST_PX_MS = 1.0;   // px per ms
+    const DECEL_MS   = 900;   // deceleration duration
 
     const loop = (now: number) => {
+      const cellH = cellHRef.current;
+      if (cellH <= 0) { rafRef.current = requestAnimationFrame(loop); return; }
+
       const elapsed = now - startTimeRef.current;
 
       if (phaseRef.current === "fast") {
-        // Fast constant spin
-        offsetRef.current = elapsed * FAST_SPEED;
-        applyTransform(offsetRef.current % STRIP_SIZE);
+        cumulativePxRef.current = elapsed * FAST_PX_MS;
+        applyTranslate(cumulativePxRef.current);
 
         if (elapsed >= stopDelay) {
-          // Transition to decel phase
           phaseRef.current = "decel";
-          decelStartOffset = offsetRef.current;
-          decelStartTime = now;
+          decelStartPxRef.current = cumulativePxRef.current;
+          decelStartTimeRef.current = now;
 
-          // Compute target: we need to land so that (targetOffset % N) === targetIndex
-          // Current position mod N:
-          const curMod = decelStartOffset % N;
-          // We need to travel at least some distance (min 1 full loop) and land on targetIndex
-          // Distance to reach targetIndex from curMod (going forward):
-          let distToTarget = (targetIndex - curMod + N) % N;
-          if (distToTarget < 2) distToTarget += N; // ensure at least 2 cells of decel
-          // Add extra loops for visual effect
-          totalDecelDistance = distToTarget + N * 1;
+          // How many full cells have we scrolled past?
+          const scrolledCells = cumulativePxRef.current / cellH; // fractional
+          // We want to land on targetIndex.
+          // The strip repeats every N cells. Find next occurrence of targetIndex
+          // that is at least MIN_EXTRA cells ahead.
+          const MIN_EXTRA = 3;
+          const fractionalPos = scrolledCells % N;
+          let cellsToTarget = (targetIndex - fractionalPos + N) % N;
+          if (cellsToTarget < MIN_EXTRA) cellsToTarget += N;
+          // Add 2 full loops for visual richness
+          cellsToTarget += N * 2;
+
+          decelDistPxRef.current = cellsToTarget * cellH;
         }
       } else if (phaseRef.current === "decel") {
-        const decelElapsed = now - decelStartTime;
-        const t = Math.min(decelElapsed / DECEL_DURATION, 1);
+        const dt = now - decelStartTimeRef.current;
+        const t = Math.min(dt / DECEL_MS, 1);
         // Ease-out cubic
         const eased = 1 - Math.pow(1 - t, 3);
-        const currentOffset = decelStartOffset + eased * totalDecelDistance;
-        offsetRef.current = currentOffset;
-        applyTransform(currentOffset % STRIP_SIZE);
+        const px = decelStartPxRef.current + eased * decelDistPxRef.current;
+        cumulativePxRef.current = px;
+        applyTranslate(px);
 
         if (t >= 1) {
-          // Snap exactly to targetIndex
-          const snappedOffset = Math.round(currentOffset / N) * N + targetIndex;
-          applyTransform(snappedOffset % STRIP_SIZE);
-          offsetRef.current = snappedOffset;
+          // Final snap: the exact target position
+          const finalPx = decelStartPxRef.current + decelDistPxRef.current;
+          // Snap to nearest cell boundary (should already be exact, but round for safety)
+          const snapped = Math.round(finalPx / cellH) * cellH;
+          cumulativePxRef.current = snapped;
+          applyTranslate(snapped);
           phaseRef.current = "done";
-          if (!stoppedFiredRef.current) {
-            stoppedFiredRef.current = true;
-            onStopped();
-          }
+          if (!firedRef.current) { firedRef.current = true; onStopped(); }
           return;
         }
       }
@@ -151,13 +167,13 @@ function Reel({
 
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [spinning, targetIndex, stopDelay, applyTransform, onStopped]);
+  }, [spinning, targetIndex, stopDelay, onStopped]);
 
-  // Build strip: render STRIP_SIZE cells, display based on current offset
-  const cells = Array.from({ length: STRIP_SIZE }, (_, i) => CHARS[i % N]);
+  const cells = Array.from({ length: N * REPS }, (_, i) => CHARS[i % N]);
 
   return (
     <div
+      ref={wrapperRef}
       style={{
         flex: "none",
         width: "30%",
@@ -170,34 +186,21 @@ function Reel({
         position: "relative",
       }}
     >
-      {/* Top/bottom fade masks */}
+      {/* Fade masks top/bottom */}
       <div style={{
         position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
-        background: "linear-gradient(180deg, rgba(245,239,224,0.9) 0%, transparent 30%, transparent 70%, rgba(237,227,204,0.9) 100%)",
+        background: "linear-gradient(180deg, rgba(245,239,224,0.9) 0%, transparent 25%, transparent 75%, rgba(237,227,204,0.9) 100%)",
       }} />
 
-      {/* Scrolling strip */}
-      <div
-        ref={containerRef}
-        style={{ display: "flex", flexDirection: "column", willChange: "transform" }}
-      >
+      {/* Strip */}
+      <div ref={stripRef} style={{ display: "flex", flexDirection: "column", willChange: "transform" }}>
         {cells.map((src, i) => (
-          <div
-            key={i}
-            style={{
-              flexShrink: 0,
-              width: "100%",
-              aspectRatio: "1 / 1",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <img
-              src={src}
-              alt="character"
-              style={{ width: "88%", height: "88%", objectFit: "contain" }}
-            />
+          <div key={i} style={{
+            flexShrink: 0, width: "100%", aspectRatio: "1 / 1",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "6% 8% 10% 8%", boxSizing: "border-box",
+          }}>
+            <img src={src} alt="character" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           </div>
         ))}
       </div>
@@ -205,36 +208,40 @@ function Reel({
   );
 }
 
+// ─── Main ─────────────────────────────────────────────────────────────────────
 type GameState = "idle" | "spinning" | "result";
 
 export default function SlotMachine() {
   const [gameState, setGameState] = useState<GameState>("idle");
   const [finals, setFinals] = useState<[number, number, number]>([0, 1, 2]);
-  const [isWin, setIsWin] = useState(false);
+  const [result, setResult] = useState<{ msg: string; color: string } | null>(null);
   const [spinKey, setSpinKey] = useState(0);
   const stoppedCount = useRef(0);
 
   const handleSpin = () => {
     if (gameState === "spinning") return;
-
-    const r0 = Math.floor(Math.random() * N);
-    let r1: number, r2: number;
     const roll = Math.random();
-    if (roll < 0.05) {
-      // Jackpot: all three same
-      r1 = r0; r2 = r0;
-    } else if (roll < 0.20) {
-      // Two same
+    let r0: number, r1: number, r2: number;
+
+    if (roll < 0.04) {
+      r0 = Math.floor(Math.random() * N); r1 = r0; r2 = r0;
+    } else if (roll < 0.10) {
+      if (Math.random() < 0.5) { r0 = CONAN_IDX; r1 = CONAN_IDX; r2 = HAIBARA_IDX; }
+      else { r0 = HAIBARA_IDX; r1 = HAIBARA_IDX; r2 = CONAN_IDX; }
+      const arr = [r0, r1, r2].sort(() => Math.random() - 0.5);
+      [r0, r1, r2] = arr as [number, number, number];
+    } else if (roll < 0.30) {
+      r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
-      r2 = r0;
+      r2 = Math.random() < 0.5 ? r0 : r1;
     } else {
-      // All different
+      r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
       do { r2 = Math.floor(Math.random() * N); } while (r2 === r0 || r2 === r1);
     }
 
     setFinals([r0, r1, r2]);
-    setIsWin(r0 === r1 || r1 === r2 || r0 === r2);
+    setResult(null);
     stoppedCount.current = 0;
     setGameState("spinning");
     setSpinKey((k) => k + 1);
@@ -242,13 +249,14 @@ export default function SlotMachine() {
 
   const handleReelStopped = useCallback(() => {
     stoppedCount.current += 1;
-    if (stoppedCount.current >= 3) {
-      setGameState("result");
-    }
+    if (stoppedCount.current >= 3) setGameState("result");
   }, []);
 
-  // Staggered stop delays: reel 0 stops first, then 1, then 2
-  const stopDelays = [1000, 1700, 2400];
+  useEffect(() => {
+    if (gameState === "result") setResult(getResult(finals));
+  }, [gameState, finals]);
+
+  const stopDelays = [900, 1600, 2300];
 
   return (
     <div style={{
@@ -268,37 +276,32 @@ export default function SlotMachine() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "flex-start",
-        padding: "4% 5%",
+        justifyContent: "space-evenly",
+        padding: "5% 5%",
         position: "relative",
         overflow: "hidden",
         boxSizing: "border-box",
       }}>
         {/* Corner diamonds */}
-        {[{ top: "8px", left: "8px" }, { top: "8px", right: "8px" }, { bottom: "8px", left: "8px" }, { bottom: "8px", right: "8px" }].map((pos, i) => (
+        {[{ top: "10px", left: "10px" }, { top: "10px", right: "10px" }, { bottom: "10px", left: "10px" }, { bottom: "10px", right: "10px" }].map((pos, i) => (
           <div key={i} style={{ position: "absolute", width: "12px", height: "12px", background: "#c8860a", transform: "rotate(45deg)", ...pos }} />
         ))}
 
         {/* Title */}
-        <div style={{ textAlign: "center", lineHeight: 1.1, marginBottom: "3%" }}>
+        <div style={{ textAlign: "center", lineHeight: 1.2 }}>
           <div style={{
-            fontSize: "clamp(14px, 4vw, 22px)", fontWeight: "900", color: "#ffd700",
+            fontSize: "clamp(14px, 4vw, 24px)", fontWeight: "900", color: "#ffd700",
             textShadow: "0 0 10px rgba(255,215,0,0.8), 0 2px 4px rgba(0,0,0,0.8)",
             letterSpacing: "0.15em",
           }}>名探偵コナン</div>
           <div style={{
             fontSize: "clamp(9px, 2.5vw, 13px)", color: "#c8860a",
-            letterSpacing: "0.3em", textTransform: "uppercase", marginTop: "2px",
+            letterSpacing: "0.3em", textTransform: "uppercase", marginTop: "3px",
           }}>SLOT MACHINE</div>
         </div>
 
         {/* Reels */}
-        <div style={{
-          width: "100%",
-          display: "flex", gap: "3%",
-          alignItems: "center", justifyContent: "center",
-          marginBottom: "3%",
-        }}>
+        <div style={{ width: "100%", display: "flex", gap: "3%", alignItems: "center", justifyContent: "center" }}>
           {([0, 1, 2] as const).map((i) => (
             <Reel
               key={`${spinKey}-${i}`}
@@ -315,7 +318,7 @@ export default function SlotMachine() {
           onClick={handleSpin}
           disabled={gameState === "spinning"}
           style={{
-            width: "65%", padding: "3% 0",
+            width: "62%", padding: "3.5% 0",
             background: gameState === "spinning"
               ? "linear-gradient(180deg, #555 0%, #333 100%)"
               : "linear-gradient(180deg, #ff4444 0%, #cc0000 50%, #990000 100%)",
@@ -329,7 +332,6 @@ export default function SlotMachine() {
             boxShadow: gameState === "spinning" ? "none" : "0 4px 15px rgba(255,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2)",
             transition: "all 0.2s ease",
             fontFamily: "inherit",
-            marginBottom: "3%",
           }}
           onMouseEnter={(e) => { if (gameState !== "spinning") (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.04)"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
@@ -337,20 +339,17 @@ export default function SlotMachine() {
           {gameState === "spinning" ? "轉動中…" : "SPIN"}
         </button>
 
-        {/* Result area — always reserves space */}
-        <div style={{
-          height: "clamp(24px, 6vh, 40px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          {gameState === "result" && (
+        {/* Result area */}
+        <div style={{ height: "clamp(22px, 5vh, 36px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {result && (
             <div style={{
               fontSize: "clamp(14px, 4vw, 20px)", fontWeight: "800",
-              color: isWin ? "#ffd700" : "#ffaaaa",
-              textShadow: isWin ? "0 0 14px rgba(255,215,0,0.9)" : "0 0 8px rgba(255,170,170,0.6)",
+              color: result.color,
+              textShadow: `0 0 14px ${result.color}88`,
               letterSpacing: "0.1em",
               animation: "fadeIn 0.4s ease",
             }}>
-              {isWin ? "🎉 恭喜中獎！" : "再接再厲！"}
+              {result.msg}
             </div>
           )}
         </div>

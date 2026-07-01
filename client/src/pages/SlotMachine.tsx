@@ -318,8 +318,8 @@ export default function SlotMachine() {
     setReelActive([true, true, true]);
     setReelShouldStop([false, false, false]);
 
-    // Stop all 3 at exactly the same time (3s)
-    const t0 = setTimeout(() => setReelShouldStop([true, true, true]), 3000);
+    // Stop all 3 at exactly the same time (2.5s)
+    const t0 = setTimeout(() => setReelShouldStop([true, true, true]), 2500);
     timersRef.current = [t0];
   };
 

@@ -1,8 +1,5 @@
-// Slot Machine — Single-cell scroll loop approach
-// Each reel shows 2 visible cells (current + next).
-// Animation: CSS transition slides from 0 → -cellH, then instantly resets to 0 with new image.
-// This creates a smooth infinite scroll feel with ZERO half-cell issues.
-// On stop: finish current transition, then snap to final image.
+// SlotMachine — parent controls ALL timing via refs/state
+// Reel is purely reactive: it spins when active=true, stops when shouldStop=true
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -15,11 +12,11 @@ const CHARS: { src: string; name: string }[] = [
   { src: "/manus-storage/sticker_6_abb39e7f.png",  name: "角色 6" },
   { src: "/manus-storage/sticker_7_7569cf9d.png",  name: "角色 7" },
   { src: "/manus-storage/sticker_9_afd19521.png",  name: "角色 9" },
-  { src: "/manus-storage/sticker_10_b73ab927.png", name: "角色 10" },
+  { src: "/manus-storage/sticker_10_b73ab927.png", name: "服部平次" },
   { src: "/manus-storage/sticker_11_91cf80f2.png", name: "角色 11" },
   { src: "/manus-storage/sticker_12_0e8f286f.png", name: "角色 12" },
   { src: "/manus-storage/sticker_13_f25ff0af.png", name: "角色 13" },
-  { src: "/manus-storage/sticker_14_3ed6df96.png", name: "角色 14" },
+  { src: "/manus-storage/sticker_14_3ed6df96.png", name: "怪盜基德" },
   { src: "/manus-storage/sticker_15_4b1839ec.png", name: "角色 15" },
   { src: "/manus-storage/sticker_16_0fbd2644.png", name: "角色 16" },
   { src: "/manus-storage/sticker_17_cbd6beac.png", name: "角色 17" },
@@ -40,10 +37,13 @@ const CHARS: { src: string; name: string }[] = [
 ];
 
 const N = CHARS.length;
-const CONAN_IDX = 0;     // sticker_1
-const HAIBARA_IDX = 29;  // haibara
-const HEIJI_IDX = 8;     // sticker_10 (平次) — 0-based index in CHARS
-const KID_IDX = 12;      // sticker_14 (基德) — 0-based index in CHARS
+const CONAN_IDX = 0;
+const HAIBARA_IDX = 29;
+const HEIJI_IDX = 8;
+const KID_IDX = 12;
+
+const TICK_MS = 60;      // ms per frame (fast spin)
+const SLOW_TICK_MS = 100; // ms per frame when about to stop
 
 function getResult(r: [number, number, number]): { msg: string; color: string } {
   const [a, b, c] = r;
@@ -52,164 +52,142 @@ function getResult(r: [number, number, number]): { msg: string; color: string } 
   const haibaraCount = r.filter((x) => x === HAIBARA_IDX).length;
   const heijiCount = r.filter((x) => x === HEIJI_IDX).length;
   const kidCount = r.filter((x) => x === KID_IDX).length;
-  // 柯哀好嗑：三格只有柯南和小哀（2+1 或 1+2）
   if (conanCount + haibaraCount === 3 && conanCount >= 1 && haibaraCount >= 1)
     return { msg: "柯哀好嗑！", color: "#ffb3d9" };
-  // 基友無敵：三格只有柯南和平次（2+1 或 1+2）
   if (conanCount + heijiCount === 3 && conanCount >= 1 && heijiCount >= 1)
     return { msg: "基友無敵！", color: "#ffa040" };
-  // 兄弟齊心：三格只有柯南和基德（2+1 或 1+2）
   if (conanCount + kidCount === 3 && conanCount >= 1 && kidCount >= 1)
     return { msg: "兄弟齊心！", color: "#80d0ff" };
   if (a === b || b === c || a === c) return { msg: "運氣不錯！", color: "#90ee90" };
   return { msg: "再接再厲！", color: "#ffaaaa" };
 }
 
-// ─── Reel ────────────────────────────────────────────────────────────────────
-// Uses a 2-cell window: [current, next]
-// Each tick: animate slide up by 1 cell (CSS transition), then on transitionend
-// instantly reset position and advance indices.
+// ─── Reel ─────────────────────────────────────────────────────────────────────
+// Props controlled entirely by parent:
+//   active: whether this reel should be spinning
+//   shouldStop: when true, finish current frame then snap to finalIndex
+//   finalIndex: target index to land on
+//   initOffset: starting position offset (so reels show different chars)
+//   onStopped: callback when reel has fully stopped
 interface ReelProps {
-  spinning: boolean;
+  active: boolean;
+  shouldStop: boolean;
   finalIndex: number;
-  startDelay: number;  // ms after spinStartTime to begin spinning
-  stopDelay: number;   // ms after spinStartTime to begin stopping
-  spinStartTime: number; // absolute timestamp when spin started
-  reelOffset: number; // starting offset so each reel shows different chars
+  initOffset: number;
   onStopped: () => void;
 }
 
-function Reel({ spinning, finalIndex, startDelay, stopDelay, spinStartTime, reelOffset, onStopped }: ReelProps) {
-  // curIdx: the image currently shown (top cell)
-  // nextIdx: the image scrolling into view (bottom cell)
-  const [curIdx, setCurIdx] = useState(0);
-  const [nextIdx, setNextIdx] = useState(1);
-  // animating: whether we're mid-transition (-cellH slide)
+function Reel({ active, shouldStop, finalIndex, initOffset, onStopped }: ReelProps) {
+  const [curIdx, setCurIdx] = useState(() => initOffset % N);
+  const [nextIdx, setNextIdx] = useState(() => (initOffset + 1) % N);
   const [animating, setAnimating] = useState(false);
-  // stopped: fully stopped, showing final result
   const [stopped, setStopped] = useState(true);
 
-  const spinningRef = useRef(false);
+  const activeRef = useRef(false);
   const shouldStopRef = useRef(false);
   const finalIdxRef = useRef(finalIndex);
-  const curIdxRef = useRef(0);
-  const nextIdxRef = useRef(1);
-  const tickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const curIdxRef = useRef(initOffset % N);
+  const nextIdxRef = useRef((initOffset + 1) % N);
+  const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync finalIndex into ref
+  // Keep refs in sync
   useEffect(() => { finalIdxRef.current = finalIndex; }, [finalIndex]);
+  useEffect(() => { shouldStopRef.current = shouldStop; }, [shouldStop]);
 
-  // Schedule next tick
-  const scheduleTick = useCallback((delay: number) => {
-    if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
-    tickTimerRef.current = setTimeout(() => {
-      if (!spinningRef.current) return;
-      // Start slide animation
-      setAnimating(true);
-    }, delay);
+  const clearTimers = useCallback(() => {
+    if (tickRef.current) { clearTimeout(tickRef.current); tickRef.current = null; }
+    if (animRef.current) { clearTimeout(animRef.current); animRef.current = null; }
   }, []);
 
-  // When spinning starts
-  useEffect(() => {
-    if (!spinning) return;
+  const doTick = useCallback(() => {
+    if (!activeRef.current) return;
+    setAnimating(true);
+  }, []);
 
-    spinningRef.current = true;
-    shouldStopRef.current = false;
-    setStopped(false);
-    setAnimating(false);
+  const scheduleTick = useCallback((delay: number) => {
+    if (tickRef.current) clearTimeout(tickRef.current);
+    tickRef.current = setTimeout(doTick, delay);
+  }, [doTick]);
 
-    // Start from offset-based position so each reel shows different chars
-    const start = (Math.floor(Math.random() * N) + reelOffset) % N;
-    curIdxRef.current = start;
-    nextIdxRef.current = (start + 1) % N;
-    setCurIdx(start);
-    setNextIdx((start + 1) % N);
-
-    // Schedule stop based on absolute spinStartTime so all reels share the same reference
-    const remaining = Math.max(0, spinStartTime + stopDelay - Date.now());
-    const stopTimer = setTimeout(() => {
-      shouldStopRef.current = true;
-    }, remaining);
-
-    // Delay start so each reel begins spinning at the right time
-    const startRemaining = Math.max(0, spinStartTime + startDelay - Date.now());
-    const startTimer = setTimeout(() => {
-      if (!spinningRef.current) return;
-      scheduleTick(0);
-    }, startRemaining);
-
-    return () => {
-      clearTimeout(startTimer);
-      clearTimeout(stopTimer);
-      if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
-    };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spinning, startDelay, stopDelay, spinStartTime]);
-
-  // When animation ends (transitionend equivalent via timeout)
-  // We use a timeout matching the CSS transition duration instead of onTransitionEnd
-  // to avoid issues with display:none or unmounted elements.
+  // Handle animation completion
   useEffect(() => {
     if (!animating) return;
-
-    // After transition completes (150ms), advance indices
-    const t = setTimeout(() => {
-      if (!spinningRef.current) return;
+    if (animRef.current) clearTimeout(animRef.current);
+    animRef.current = setTimeout(() => {
+      if (!activeRef.current) return;
 
       const newCur = nextIdxRef.current;
       const newNext = (newCur + 1) % N;
 
-      // Check if we should stop: if shouldStop and newCur === finalIndex
+      // Check if we should stop on this frame
       if (shouldStopRef.current && newCur === finalIdxRef.current) {
-        // Land on final
         curIdxRef.current = newCur;
         nextIdxRef.current = newNext;
         setCurIdx(newCur);
         setNextIdx(newNext);
         setAnimating(false);
-        spinningRef.current = false;
+        activeRef.current = false;
         setStopped(true);
         onStopped();
         return;
       }
 
-      // Continue spinning: advance by 1 step (always 1 for smooth scroll)
       curIdxRef.current = newCur;
       nextIdxRef.current = newNext;
       setCurIdx(newCur);
       setNextIdx(newNext);
-      setAnimating(false); // reset to top instantly
+      setAnimating(false);
 
-      // Schedule next tick — fast spin, slow down when about to stop
-      const delay = shouldStopRef.current ? 80 : 30;
+      const delay = shouldStopRef.current ? SLOW_TICK_MS : TICK_MS;
       scheduleTick(delay);
-    }, 60); // must match CSS transition duration
+    }, TICK_MS);
 
-    return () => clearTimeout(t);
+    return () => { if (animRef.current) clearTimeout(animRef.current); };
   }, [animating, onStopped, scheduleTick]);
+
+  // React to active changing
+  useEffect(() => {
+    if (active) {
+      // Start spinning
+      activeRef.current = true;
+      shouldStopRef.current = false;
+      setStopped(false);
+      setAnimating(false);
+      // Randomize start position
+      const start = (Math.floor(Math.random() * N) + initOffset) % N;
+      curIdxRef.current = start;
+      nextIdxRef.current = (start + 1) % N;
+      setCurIdx(start);
+      setNextIdx((start + 1) % N);
+      scheduleTick(0);
+    } else {
+      // Stopped externally (shouldn't happen normally)
+      activeRef.current = false;
+      clearTimers();
+    }
+    return clearTimers;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   const char0 = CHARS[curIdx];
   const char1 = CHARS[nextIdx];
 
   return (
-    <div
-      style={{
-        flex: "none",
-        width: "28%",
-        aspectRatio: "1 / 1",
-        background: stopped ? "#fdf6e8" : "#fff8ee",
-        border: `3px solid ${stopped ? "#c8860a" : "#ff6600"}`,
-        borderRadius: "12px",
-        overflow: "hidden",
-        boxShadow: stopped
-          ? "0 0 10px rgba(200,134,10,0.3), inset 0 2px 8px rgba(0,0,0,0.15)"
-          : "0 0 20px rgba(255,102,0,0.8), inset 0 2px 8px rgba(0,0,0,0.1)",
-        position: "relative",
-        transition: "border-color 0.3s, box-shadow 0.3s",
-      }}
-    >
-      {/* Top/bottom fade masks */}
+    <div style={{
+      flex: "none",
+      width: "28%",
+      aspectRatio: "1 / 1",
+      background: stopped ? "#fdf6e8" : "#fff8ee",
+      border: `3px solid ${stopped ? "#c8860a" : "#ff6600"}`,
+      borderRadius: "12px",
+      overflow: "hidden",
+      boxShadow: stopped
+        ? "0 0 10px rgba(200,134,10,0.3), inset 0 2px 8px rgba(0,0,0,0.15)"
+        : "0 0 20px rgba(255,102,0,0.8), inset 0 2px 8px rgba(0,0,0,0.1)",
+      position: "relative",
+      transition: "border-color 0.3s, box-shadow 0.3s",
+    }}>
       {!stopped && (
         <>
           <div style={{
@@ -224,42 +202,30 @@ function Reel({ spinning, finalIndex, startDelay, stopDelay, spinStartTime, reel
           }} />
         </>
       )}
-
-      {/* Sliding strip: 2 cells stacked */}
-      <div
-        style={{
-          width: "100%",
-          height: "200%", // 2 cells
-          display: "flex",
-          flexDirection: "column",
-          transform: animating ? "translateY(-50%)" : "translateY(0)",
-          transition: animating ? "transform 60ms linear" : "none",
-          willChange: "transform",
-        }}
-      >
+      <div style={{
+        width: "100%",
+        height: "200%",
+        display: "flex",
+        flexDirection: "column",
+        transform: animating ? "translateY(-50%)" : "translateY(0)",
+        transition: animating ? `transform ${TICK_MS}ms linear` : "none",
+        willChange: "transform",
+      }}>
         {[char0, char1].map((ch, i) => (
-          <div
-            key={i}
-            style={{
+          <div key={i} style={{
+            width: "100%",
+            height: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "10%",
+            boxSizing: "border-box",
+          }}>
+            <img src={ch.src} alt={ch.name} style={{
               width: "100%",
-              height: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "10%",
-              boxSizing: "border-box",
-            }}
-          >
-            <img
-              src={ch.src}
-              alt={ch.name}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                imageRendering: "crisp-edges",
-              }}
-            />
+              height: "100%",
+              objectFit: "contain",
+            }} />
           </div>
         ))}
       </div>
@@ -268,19 +234,29 @@ function Reel({ spinning, finalIndex, startDelay, stopDelay, spinStartTime, reel
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-type GameState = "idle" | "spinning" | "result";
+type Phase = "idle" | "spinning" | "result";
 
 export default function SlotMachine() {
-  const [gameState, setGameState] = useState<GameState>("idle");
+  const [phase, setPhase] = useState<Phase>("idle");
   const [finals, setFinals] = useState<[number, number, number]>([CONAN_IDX, CONAN_IDX, CONAN_IDX]);
   const [result, setResult] = useState<{ msg: string; color: string } | null>(null);
-  const [spinKey, setSpinKey] = useState(0);
-  const [spinStartTime, setSpinStartTime] = useState(0);
+  const [spinCount, setSpinCount] = useState(0);
+
+  // Per-reel state controlled by parent
+  const [reelActive, setReelActive] = useState<[boolean, boolean, boolean]>([false, false, false]);
+  const [reelShouldStop, setReelShouldStop] = useState<[boolean, boolean, boolean]>([false, false, false]);
   const stoppedCount = useRef(0);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearAllTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
 
   const handleSpin = () => {
-    if (gameState === "spinning") return;
+    if (phase === "spinning") return;
 
+    // Pick finals
     const roll = Math.random();
     let r0: number, r1: number, r2: number;
 
@@ -288,68 +264,68 @@ export default function SlotMachine() {
       const idx = Math.floor(Math.random() * N);
       r0 = r1 = r2 = idx;
     } else if (roll < 0.10) {
-      // 柯哀好嗑：2+1 or 1+2
       if (Math.random() < 0.5) {
-        const arr = [CONAN_IDX, CONAN_IDX, HAIBARA_IDX].sort(() => Math.random() - 0.5);
-        [r0, r1, r2] = arr as [number, number, number];
+        [r0, r1, r2] = [CONAN_IDX, CONAN_IDX, HAIBARA_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
       } else {
-        const arr = [HAIBARA_IDX, HAIBARA_IDX, CONAN_IDX].sort(() => Math.random() - 0.5);
-        [r0, r1, r2] = arr as [number, number, number];
+        [r0, r1, r2] = [HAIBARA_IDX, HAIBARA_IDX, CONAN_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
       }
     } else if (roll < 0.16) {
-      // 基友無敵：柯南+平次 2+1 or 1+2
       if (Math.random() < 0.5) {
-        const arr = [CONAN_IDX, CONAN_IDX, HEIJI_IDX].sort(() => Math.random() - 0.5);
-        [r0, r1, r2] = arr as [number, number, number];
+        [r0, r1, r2] = [CONAN_IDX, CONAN_IDX, HEIJI_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
       } else {
-        const arr = [HEIJI_IDX, HEIJI_IDX, CONAN_IDX].sort(() => Math.random() - 0.5);
-        [r0, r1, r2] = arr as [number, number, number];
+        [r0, r1, r2] = [HEIJI_IDX, HEIJI_IDX, CONAN_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
       }
     } else if (roll < 0.22) {
-      // 兄弟齊心：柯南+基德 2+1 or 1+2
       if (Math.random() < 0.5) {
-        const arr = [CONAN_IDX, CONAN_IDX, KID_IDX].sort(() => Math.random() - 0.5);
-        [r0, r1, r2] = arr as [number, number, number];
+        [r0, r1, r2] = [CONAN_IDX, CONAN_IDX, KID_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
       } else {
-        const arr = [KID_IDX, KID_IDX, CONAN_IDX].sort(() => Math.random() - 0.5);
-        [r0, r1, r2] = arr as [number, number, number];
+        [r0, r1, r2] = [KID_IDX, KID_IDX, CONAN_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
       }
     } else if (roll < 0.40) {
       r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
       r2 = Math.random() < 0.5 ? r0 : r1;
-      const arr = [r0, r1, r2].sort(() => Math.random() - 0.5);
-      [r0, r1, r2] = arr as [number, number, number];
+      [r0, r1, r2] = [r0, r1, r2].sort(() => Math.random() - 0.5) as [number, number, number];
     } else {
       r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
       do { r2 = Math.floor(Math.random() * N); } while (r2 === r0 || r2 === r1);
     }
 
-    const now = Date.now();
     setFinals([r0, r1, r2]);
     setResult(null);
     stoppedCount.current = 0;
-    setSpinStartTime(now);
-    setGameState("spinning");
-    setSpinKey((k) => k + 1);
+    setPhase("spinning");
+    setSpinCount((c) => c + 1);
+    clearAllTimers();
+
+    // Start all 3 reels simultaneously
+    setReelActive([true, true, true]);
+    setReelShouldStop([false, false, false]);
+
+    // Stop left at 2s, mid at 3s, right at 4s
+    const t0 = setTimeout(() => setReelShouldStop([true, false, false]), 2000);
+    const t1 = setTimeout(() => setReelShouldStop([true, true, false]), 3000);
+    const t2 = setTimeout(() => setReelShouldStop([true, true, true]), 4000);
+    timersRef.current = [t0, t1, t2];
   };
 
   const handleReelStopped = useCallback(() => {
     stoppedCount.current += 1;
-    if (stoppedCount.current >= 3) setGameState("result");
+    if (stoppedCount.current >= 3) {
+      setPhase("result");
+    }
   }, []);
 
   useEffect(() => {
-    if (gameState === "result") setResult(getResult(finals));
-  }, [gameState, finals]);
+    if (phase === "result") {
+      setResult(getResult(finals));
+      setReelActive([false, false, false]);
+    }
+  }, [phase, finals]);
 
-  // Each reel: startDelay + spinDuration = stopDelay (same spin duration ~2.5s)
-  // left: start 0ms, stop 2500ms
-  // mid:  start 400ms, stop 2900ms
-  // right: start 800ms, stop 3300ms
-  const startDelays = [0, 400, 800];
-  const stopDelays = [2500, 2900, 3300];
+  // Cleanup on unmount
+  useEffect(() => () => clearAllTimers(), []);
 
   return (
     <div style={{
@@ -427,13 +403,11 @@ export default function SlotMachine() {
         }}>
           {([0, 1, 2] as const).map((i) => (
             <Reel
-              key={`${spinKey}-${i}`}
-              spinning={gameState === "spinning"}
+              key={`reel-${i}`}
+              active={reelActive[i]}
+              shouldStop={reelShouldStop[i]}
               finalIndex={finals[i]}
-              startDelay={startDelays[i]}
-              stopDelay={stopDelays[i]}
-              spinStartTime={spinStartTime}
-              reelOffset={i * 10} // each reel starts 10 chars apart
+              initOffset={i * 10}
               onStopped={handleReelStopped}
             />
           ))}
@@ -443,70 +417,66 @@ export default function SlotMachine() {
 
         {/* Result */}
         <div style={{ minHeight: "28px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {result && (
+          {result ? (
             <div style={{
               fontSize: "clamp(14px, 4vw, 18px)",
-              fontWeight: "800",
+              fontWeight: "700",
               color: result.color,
-              textShadow: `0 0 16px ${result.color}99`,
+              textShadow: `0 0 12px ${result.color}88`,
               letterSpacing: "0.08em",
-              animation: "popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
             }}>
               {result.msg}
             </div>
-          )}
-          {!result && gameState === "idle" && (
-            <div style={{ fontSize: "12px", color: "#664422", letterSpacing: "0.2em" }}>按下 SPIN 開始</div>
-          )}
-          {!result && gameState === "spinning" && (
-            <div style={{ fontSize: "12px", color: "#c8860a", letterSpacing: "0.2em", opacity: 0.8 }}>轉動中…</div>
-          )}
+          ) : phase === "idle" ? (
+            <div style={{ fontSize: "clamp(11px, 3vw, 13px)", color: "#8a6030", opacity: 0.7, letterSpacing: "0.1em" }}>
+              按下 SPIN 開始
+            </div>
+          ) : null}
         </div>
 
-        {/* Spin button */}
+        {/* Spin count */}
+        {spinCount > 0 && (
+          <div style={{
+            position: "absolute",
+            top: "16px",
+            right: "28px",
+            background: "#ffd700",
+            color: "#1a0500",
+            fontSize: "11px",
+            fontWeight: "800",
+            borderRadius: "4px",
+            padding: "2px 6px",
+            letterSpacing: "0.05em",
+          }}>
+            {spinCount}
+          </div>
+        )}
+
+        {/* SPIN button */}
         <button
           onClick={handleSpin}
-          disabled={gameState === "spinning"}
+          disabled={phase === "spinning"}
           style={{
             width: "100%",
-            padding: "14px 0",
-            background: gameState === "spinning"
-              ? "linear-gradient(180deg, #3a2010 0%, #2a1508 100%)"
-              : "linear-gradient(180deg, #ff5500 0%, #cc2200 40%, #991100 100%)",
-            border: "2px solid",
-            borderColor: gameState === "spinning" ? "#5a3020" : "#ff8844",
-            borderRadius: "50px",
-            color: gameState === "spinning" ? "#664422" : "#fff",
-            fontSize: "clamp(14px, 4vw, 18px)",
-            fontWeight: "900",
+            padding: "14px",
+            fontSize: "clamp(14px, 4vw, 17px)",
+            fontWeight: "800",
             letterSpacing: "0.25em",
-            cursor: gameState === "spinning" ? "not-allowed" : "pointer",
-            boxShadow: gameState === "spinning"
-              ? "none"
-              : "0 4px 20px rgba(255,85,0,0.5), 0 1px 0 rgba(255,255,255,0.15) inset",
-            transition: "all 0.2s ease",
-            fontFamily: "inherit",
-            textTransform: "uppercase",
-          }}
-          onMouseEnter={(e) => {
-            if (gameState !== "spinning") {
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.03)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+            color: phase === "spinning" ? "#8a6030" : "#fff8ee",
+            background: phase === "spinning"
+              ? "linear-gradient(180deg, #3a1500 0%, #2a0a00 100%)"
+              : "linear-gradient(180deg, #e03000 0%, #a02000 100%)",
+            border: `2px solid ${phase === "spinning" ? "#5a3010" : "#ff6030"}`,
+            borderRadius: "12px",
+            cursor: phase === "spinning" ? "not-allowed" : "pointer",
+            boxShadow: phase === "spinning" ? "none" : "0 4px 20px rgba(200,50,0,0.5), inset 0 1px 0 rgba(255,150,100,0.3)",
+            transition: "all 0.2s",
+            outline: "none",
           }}
         >
-          {gameState === "spinning" ? "轉動中…" : "SPIN"}
+          {phase === "spinning" ? "轉動中…" : "SPIN"}
         </button>
       </div>
-
-      <style>{`
-        @keyframes popIn {
-          from { opacity: 0; transform: scale(0.6); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
     </div>
   );
 }

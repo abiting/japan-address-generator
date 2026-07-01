@@ -39,9 +39,17 @@ const HAIBARA_IDX = 29;
 const HEIJI_IDX   = 8;
 const KID_IDX     = 12;
 
-const CELL   = 160;
 const TICK   = 55;
 const COPIES = 6;
+
+// 依視窗寬度決定格子尺寸
+function getCellSize(): number {
+  const vw = window.innerWidth;
+  if (vw <= 360) return 90;
+  if (vw <= 430) return 100;
+  if (vw <= 520) return 110;
+  return 160;
+}
 
 function getResult(r: [number, number, number]): { msg: string; color: string } {
   const [a, b, c] = r;
@@ -61,14 +69,20 @@ interface ReelProps {
   spinning: boolean;
   finalIndex: number;
   reelIndex: number;
+  cell: number;
 }
 
-function Reel({ spinning, finalIndex, reelIndex }: ReelProps) {
+function Reel({ spinning, finalIndex, reelIndex, cell }: ReelProps) {
   const strip = Array.from({ length: COPIES * N }, (_, i) => CHARS[i % N]);
   const currentCellRef = useRef(reelIndex * 3);
-  const [translateY, setTranslateY] = useState(-(reelIndex * 3) * CELL);
+  const [translateY, setTranslateY] = useState(-(reelIndex * 3) * cell);
   const [transition, setTransition] = useState("none");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 當 cell 尺寸改變時重設位置（視窗 resize）
+  useEffect(() => {
+    setTranslateY(-currentCellRef.current * cell);
+  }, [cell]);
 
   useEffect(() => {
     if (spinning) {
@@ -78,7 +92,7 @@ function Reel({ spinning, finalIndex, reelIndex }: ReelProps) {
         if (currentCellRef.current >= (COPIES - 2) * N) {
           currentCellRef.current -= N;
         }
-        setTranslateY(-currentCellRef.current * CELL);
+        setTranslateY(-currentCellRef.current * cell);
       }, TICK);
     } else {
       if (intervalRef.current) {
@@ -92,17 +106,17 @@ function Reel({ spinning, finalIndex, reelIndex }: ReelProps) {
       const targetCell = cur + stepsForward;
       currentCellRef.current = targetCell;
       setTransition("transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1)");
-      setTranslateY(-targetCell * CELL);
+      setTranslateY(-targetCell * cell);
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [spinning, finalIndex]);
+  }, [spinning, finalIndex, cell]);
 
   return (
     <div style={{
-      width: `${CELL}px`,
-      height: `${CELL}px`,
+      width: `${cell}px`,
+      height: `${cell}px`,
       overflow: "hidden",
       borderRadius: "10px",
       border: `2px solid ${spinning ? "#ff8c00" : "#8b6914"}`,
@@ -128,12 +142,12 @@ function Reel({ spinning, finalIndex, reelIndex }: ReelProps) {
       }}>
         {strip.map((ch, i) => (
           <div key={i} style={{
-            width: `${CELL}px`,
-            height: `${CELL}px`,
+            width: `${cell}px`,
+            height: `${cell}px`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: "12px",
+            padding: "10px",
             boxSizing: "border-box",
           }}>
             <img
@@ -151,12 +165,20 @@ function Reel({ spinning, finalIndex, reelIndex }: ReelProps) {
 type Phase = "idle" | "spinning" | "result";
 
 export default function SlotMachine() {
-  const [phase, setPhase]       = useState<Phase>("idle");
-  const [spinning, setSpinning] = useState(false);
-  const [finals, setFinals]     = useState<[number, number, number]>([CONAN_IDX, CONAN_IDX, CONAN_IDX]);
-  const [result, setResult]     = useState<{ msg: string; color: string } | null>(null);
+  const [phase, setPhase]         = useState<Phase>("idle");
+  const [spinning, setSpinning]   = useState(false);
+  const [finals, setFinals]       = useState<[number, number, number]>([CONAN_IDX, CONAN_IDX, CONAN_IDX]);
+  const [result, setResult]       = useState<{ msg: string; color: string } | null>(null);
   const [spinCount, setSpinCount] = useState(0);
+  const [cell, setCell]           = useState(() => getCellSize());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 監聽視窗 resize，動態更新格子尺寸
+  useEffect(() => {
+    const onResize = () => setCell(getCellSize());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const handleSpin = () => {
     if (phase === "spinning") return;
@@ -207,6 +229,9 @@ export default function SlotMachine() {
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
+  // 機台寬度 = 3格 + 2間距(12px) + 左右padding(28px*2)
+  const machineWidth = cell * 3 + 12 * 2 + 28 * 2;
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -215,16 +240,21 @@ export default function SlotMachine() {
       alignItems: "center",
       justifyContent: "center",
       fontFamily: "'Noto Serif JP', serif",
+      padding: "16px",
+      boxSizing: "border-box",
     }}>
       <div style={{
         background: "linear-gradient(160deg, #2d1a0a 0%, #1a0d05 100%)",
         border: "3px solid #8b6914",
         borderRadius: "20px",
-        padding: "32px 28px 28px",
+        padding: "28px 28px 24px",
         boxShadow: "0 0 60px rgba(180,120,0,0.4), 0 0 120px rgba(180,80,0,0.2), inset 0 1px 0 rgba(255,200,80,0.15)",
         position: "relative",
-        display: "inline-block",
+        width: `${machineWidth}px`,
+        maxWidth: "100%",
+        boxSizing: "border-box",
       }}>
+        {/* 四角螺絲 */}
         {[
           { top: "10px", left: "14px" },
           { top: "10px", right: "14px" },
@@ -239,67 +269,71 @@ export default function SlotMachine() {
           }} />
         ))}
 
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+        {/* 標題 */}
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
           <div style={{
-            fontSize: "clamp(22px, 5vw, 30px)",
+            fontSize: "clamp(18px, 6vw, 30px)",
             fontWeight: "bold",
             color: "#ffd700",
             textShadow: "0 0 20px rgba(255,215,0,0.6), 0 2px 4px rgba(0,0,0,0.8)",
             letterSpacing: "0.1em",
           }}>名探偵コナン</div>
           <div style={{
-            fontSize: "11px", color: "#c8a020",
+            fontSize: "10px", color: "#c8a020",
             letterSpacing: "0.35em", marginTop: "4px", opacity: 0.8,
           }}>SLOT MACHINE</div>
         </div>
 
+        {/* 轉輪區 */}
         <div style={{
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
           gap: "12px",
-          marginBottom: "20px",
-          padding: "16px 14px",
+          marginBottom: "16px",
+          padding: "12px 10px",
           background: "rgba(0,0,0,0.3)",
           borderRadius: "12px",
           border: "1px solid rgba(200,134,10,0.3)",
         }}>
           {([0, 1, 2] as const).map(i => (
-            <Reel key={i} spinning={spinning} finalIndex={finals[i]} reelIndex={i} />
+            <Reel key={i} spinning={spinning} finalIndex={finals[i]} reelIndex={i} cell={cell} />
           ))}
         </div>
 
+        {/* 結果文字 */}
         <div style={{
           textAlign: "center",
-          height: "30px",
-          marginBottom: "16px",
+          height: "28px",
+          marginBottom: "14px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}>
           {phase === "spinning" && (
-            <span style={{ color: "#c8a020", fontSize: "14px", opacity: 0.7 }}>轉動中…</span>
+            <span style={{ color: "#c8a020", fontSize: "13px", opacity: 0.7 }}>轉動中…</span>
           )}
           {phase === "result" && result && (
             <span style={{
               color: result.color,
-              fontSize: "20px",
+              fontSize: "clamp(16px, 5vw, 20px)",
               fontWeight: "bold",
               textShadow: `0 0 14px ${result.color}`,
             }}>{result.msg}</span>
           )}
           {phase === "idle" && (
-            <span style={{ color: "#8b6914", fontSize: "13px", opacity: 0.6 }}>按下 SPIN 開始</span>
+            <span style={{ color: "#8b6914", fontSize: "12px", opacity: 0.6 }}>按下 SPIN 開始</span>
           )}
         </div>
 
+        {/* SPIN 按鈕 */}
         <button
           onClick={handleSpin}
           disabled={phase === "spinning"}
           style={{
             width: "100%",
             padding: "14px",
-            fontSize: "18px",
+            fontSize: "clamp(15px, 4vw, 18px)",
             fontWeight: "bold",
             letterSpacing: "0.2em",
             color: phase === "spinning" ? "#888" : "#fff",
@@ -318,6 +352,7 @@ export default function SlotMachine() {
           {phase === "spinning" ? "轉動中…" : "SPIN"}
         </button>
 
+        {/* 次數計數 */}
         {spinCount > 0 && (
           <div style={{
             position: "absolute", top: "10px", right: "14px",

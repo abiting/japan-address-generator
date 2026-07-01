@@ -1,7 +1,4 @@
-// SlotMachine — parent controls ALL timing via refs/state
-// Reel is purely reactive: it spins when active=true, stops when shouldStop=true
-
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const CHARS: { src: string; name: string }[] = [
   { src: "/manus-storage/sticker_1_5b7efd09.png",  name: "江戶川柯南" },
@@ -37,210 +34,113 @@ const CHARS: { src: string; name: string }[] = [
 ];
 
 const N = CHARS.length;
-const CONAN_IDX = 0;
+const CONAN_IDX   = 0;
 const HAIBARA_IDX = 29;
-const HEIJI_IDX = 8;
-const KID_IDX = 12;
+const HEIJI_IDX   = 8;
+const KID_IDX     = 12;
 
-const TICK_MS = 60;      // ms per frame (fast spin)
-const SLOW_TICK_MS = 100; // ms per frame when about to stop
+const CELL   = 160;
+const TICK   = 55;
+const COPIES = 6;
 
 function getResult(r: [number, number, number]): { msg: string; color: string } {
   const [a, b, c] = r;
   if (a === b && b === c) return { msg: "恭喜中獎！", color: "#ffd700" };
-  const conanCount = r.filter((x) => x === CONAN_IDX).length;
-  const haibaraCount = r.filter((x) => x === HAIBARA_IDX).length;
-  const heijiCount = r.filter((x) => x === HEIJI_IDX).length;
-  const kidCount = r.filter((x) => x === KID_IDX).length;
-  if (conanCount + haibaraCount === 3 && conanCount >= 1 && haibaraCount >= 1)
-    return { msg: "柯哀好嗑！", color: "#ffb3d9" };
-  if (conanCount + heijiCount === 3 && conanCount >= 1 && heijiCount >= 1)
-    return { msg: "基友無敵！", color: "#ffa040" };
-  if (conanCount + kidCount === 3 && conanCount >= 1 && kidCount >= 1)
-    return { msg: "兄弟齊心！", color: "#80d0ff" };
-  if (a === b || b === c || a === c) return { msg: "運氣不錯！", color: "#90ee90" };
+  const cc = r.filter(x => x === CONAN_IDX).length;
+  const hc = r.filter(x => x === HAIBARA_IDX).length;
+  const hj = r.filter(x => x === HEIJI_IDX).length;
+  const kd = r.filter(x => x === KID_IDX).length;
+  if (cc + hc === 3 && cc >= 1 && hc >= 1) return { msg: "柯哀好嗑！", color: "#ffb3d9" };
+  if (cc + hj === 3 && cc >= 1 && hj >= 1) return { msg: "基友無敵！", color: "#ffa040" };
+  if (cc + kd === 3 && cc >= 1 && kd >= 1) return { msg: "兄弟齊心！", color: "#80d0ff" };
+  if (a === b || b === c || a === c)        return { msg: "運氣不錯！", color: "#90ee90" };
   return { msg: "再接再厲！", color: "#ffaaaa" };
 }
 
-// ─── Reel ─────────────────────────────────────────────────────────────────────
-// Props controlled entirely by parent:
-//   active: whether this reel should be spinning
-//   shouldStop: when true, finish current frame then snap to finalIndex
-//   finalIndex: target index to land on
-//   initOffset: starting position offset (so reels show different chars)
-//   onStopped: callback when reel has fully stopped
 interface ReelProps {
-  active: boolean;
-  shouldStop: boolean;
+  spinning: boolean;
   finalIndex: number;
-  initOffset: number;
-  onStopped: () => void;
+  reelIndex: number;
 }
 
-function Reel({ active, shouldStop, finalIndex, initOffset, onStopped }: ReelProps) {
-  const [curIdx, setCurIdx] = useState(() => initOffset % N);
-  const [nextIdx, setNextIdx] = useState(() => (initOffset + 1) % N);
-  const [animating, setAnimating] = useState(false);
-  const [stopped, setStopped] = useState(true);
+function Reel({ spinning, finalIndex, reelIndex }: ReelProps) {
+  const strip = Array.from({ length: COPIES * N }, (_, i) => CHARS[i % N]);
+  const currentCellRef = useRef(reelIndex * 3);
+  const [translateY, setTranslateY] = useState(-(reelIndex * 3) * CELL);
+  const [transition, setTransition] = useState("none");
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const activeRef = useRef(false);
-  const shouldStopRef = useRef(false);
-  const finalIdxRef = useRef(finalIndex);
-  const curIdxRef = useRef(initOffset % N);
-  const nextIdxRef = useRef((initOffset + 1) % N);
-  const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const animRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stopCountdownRef = useRef(-1); // -1 = not counting; when shouldStop set, counts down from N
-
-  // Keep refs in sync
-  useEffect(() => { finalIdxRef.current = finalIndex; }, [finalIndex]);
   useEffect(() => {
-    shouldStopRef.current = shouldStop;
-    if (shouldStop && stopCountdownRef.current < 0) {
-      // Start countdown: after at most N ticks, force-stop
-      stopCountdownRef.current = N;
-    }
-  }, [shouldStop]);
-
-  const clearTimers = useCallback(() => {
-    if (tickRef.current) { clearTimeout(tickRef.current); tickRef.current = null; }
-    if (animRef.current) { clearTimeout(animRef.current); animRef.current = null; }
-  }, []);
-
-  const doTick = useCallback(() => {
-    if (!activeRef.current) return;
-    setAnimating(true);
-  }, []);
-
-  const scheduleTick = useCallback((delay: number) => {
-    if (tickRef.current) clearTimeout(tickRef.current);
-    tickRef.current = setTimeout(doTick, delay);
-  }, [doTick]);
-
-  // Handle animation completion
-  useEffect(() => {
-    if (!animating) return;
-    if (animRef.current) clearTimeout(animRef.current);
-    animRef.current = setTimeout(() => {
-      if (!activeRef.current) return;
-
-      const newCur = nextIdxRef.current;
-      const newNext = (newCur + 1) % N;
-
-      // Countdown: decrement each tick after shouldStop is set
-      if (stopCountdownRef.current > 0) stopCountdownRef.current--;
-
-      // Stop if: (a) we reached finalIndex, or (b) countdown expired (force stop)
-      const forceStop = shouldStopRef.current && stopCountdownRef.current === 0;
-      if (shouldStopRef.current && (newCur === finalIdxRef.current || forceStop)) {
-        // If force-stop, snap directly to finalIndex
-        const landIdx = forceStop ? finalIdxRef.current : newCur;
-        curIdxRef.current = landIdx;
-        nextIdxRef.current = (landIdx + 1) % N;
-        setCurIdx(landIdx);
-        setNextIdx((landIdx + 1) % N);
-        setAnimating(false);
-        activeRef.current = false;
-        stopCountdownRef.current = -1;
-        setStopped(true);
-        onStopped();
-        return;
-      }
-
-      curIdxRef.current = newCur;
-      nextIdxRef.current = newNext;
-      setCurIdx(newCur);
-      setNextIdx(newNext);
-      setAnimating(false);
-
-      const delay = shouldStopRef.current ? SLOW_TICK_MS : TICK_MS;
-      scheduleTick(delay);
-    }, TICK_MS);
-
-    return () => { if (animRef.current) clearTimeout(animRef.current); };
-  }, [animating, onStopped, scheduleTick]);
-
-  // React to active changing
-  useEffect(() => {
-    if (active) {
-      // Start spinning
-      activeRef.current = true;
-      shouldStopRef.current = false;
-      stopCountdownRef.current = -1;
-      setStopped(false);
-      setAnimating(false);
-      // Randomize start position
-      const start = (Math.floor(Math.random() * N) + initOffset) % N;
-      curIdxRef.current = start;
-      nextIdxRef.current = (start + 1) % N;
-      setCurIdx(start);
-      setNextIdx((start + 1) % N);
-      scheduleTick(0);
+    if (spinning) {
+      setTransition("none");
+      intervalRef.current = setInterval(() => {
+        currentCellRef.current += 1;
+        if (currentCellRef.current >= (COPIES - 2) * N) {
+          currentCellRef.current -= N;
+        }
+        setTranslateY(-currentCellRef.current * CELL);
+      }, TICK);
     } else {
-      // Stopped externally (shouldn't happen normally)
-      activeRef.current = false;
-      clearTimers();
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      const cur = currentCellRef.current;
+      const curMod = cur % N;
+      let stepsForward = (finalIndex - curMod + N) % N;
+      if (stepsForward === 0) stepsForward = N;
+      const targetCell = cur + stepsForward;
+      currentCellRef.current = targetCell;
+      setTransition("transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1)");
+      setTranslateY(-targetCell * CELL);
     }
-    return clearTimers;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
-
-  const char0 = CHARS[curIdx];
-  const char1 = CHARS[nextIdx];
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [spinning, finalIndex]);
 
   return (
     <div style={{
-      flex: "none",
-      width: "28%",
-      aspectRatio: "1 / 1",
-      background: stopped ? "#fdf6e8" : "#fff8ee",
-      border: `3px solid ${stopped ? "#c8860a" : "#ff6600"}`,
-      borderRadius: "12px",
+      width: `${CELL}px`,
+      height: `${CELL}px`,
       overflow: "hidden",
-      boxShadow: stopped
-        ? "0 0 10px rgba(200,134,10,0.3), inset 0 2px 8px rgba(0,0,0,0.15)"
-        : "0 0 20px rgba(255,102,0,0.8), inset 0 2px 8px rgba(0,0,0,0.1)",
+      borderRadius: "10px",
+      border: `2px solid ${spinning ? "#ff8c00" : "#8b6914"}`,
+      background: "#fffbf0",
+      boxShadow: spinning
+        ? "0 0 14px rgba(255,140,0,0.7), inset 0 0 8px rgba(255,140,0,0.2)"
+        : "inset 0 2px 8px rgba(0,0,0,0.15)",
+      transition: "border-color 0.2s, box-shadow 0.2s",
       position: "relative",
-      transition: "border-color 0.3s, box-shadow 0.3s",
+      flexShrink: 0,
     }}>
-      {!stopped && (
-        <>
-          <div style={{
-            position: "absolute", top: 0, left: 0, right: 0, height: "25%", zIndex: 3,
-            background: "linear-gradient(180deg, rgba(255,248,238,0.85) 0%, transparent 100%)",
-            pointerEvents: "none",
-          }} />
-          <div style={{
-            position: "absolute", bottom: 0, left: 0, right: 0, height: "25%", zIndex: 3,
-            background: "linear-gradient(0deg, rgba(255,248,238,0.85) 0%, transparent 100%)",
-            pointerEvents: "none",
-          }} />
-        </>
-      )}
       <div style={{
+        position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
+        background: "linear-gradient(180deg, rgba(255,251,240,0.55) 0%, transparent 25%, transparent 75%, rgba(255,251,240,0.55) 100%)",
+      }} />
+      <div style={{
+        position: "absolute",
+        top: 0, left: 0,
         width: "100%",
-        height: "200%",
-        display: "flex",
-        flexDirection: "column",
-        transform: animating ? "translateY(-50%)" : "translateY(0)",
-        transition: animating ? `transform ${TICK_MS}ms linear` : "none",
+        transform: `translateY(${translateY}px)`,
+        transition,
         willChange: "transform",
       }}>
-        {[char0, char1].map((ch, i) => (
+        {strip.map((ch, i) => (
           <div key={i} style={{
-            width: "100%",
-            height: "50%",
+            width: `${CELL}px`,
+            height: `${CELL}px`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: "10%",
+            padding: "12px",
             boxSizing: "border-box",
           }}>
-            <img src={ch.src} alt={ch.name} style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-            }} />
+            <img
+              src={ch.src}
+              alt={ch.name}
+              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+            />
           </div>
         ))}
       </div>
@@ -248,247 +148,187 @@ function Reel({ active, shouldStop, finalIndex, initOffset, onStopped }: ReelPro
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
 type Phase = "idle" | "spinning" | "result";
 
 export default function SlotMachine() {
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [finals, setFinals] = useState<[number, number, number]>([CONAN_IDX, CONAN_IDX, CONAN_IDX]);
-  const [result, setResult] = useState<{ msg: string; color: string } | null>(null);
+  const [phase, setPhase]       = useState<Phase>("idle");
+  const [spinning, setSpinning] = useState(false);
+  const [finals, setFinals]     = useState<[number, number, number]>([CONAN_IDX, CONAN_IDX, CONAN_IDX]);
+  const [result, setResult]     = useState<{ msg: string; color: string } | null>(null);
   const [spinCount, setSpinCount] = useState(0);
-
-  // Per-reel state controlled by parent
-  const [reelActive, setReelActive] = useState<[boolean, boolean, boolean]>([false, false, false]);
-  const [reelShouldStop, setReelShouldStop] = useState<[boolean, boolean, boolean]>([false, false, false]);
-  const stoppedCount = useRef(0);
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  const clearAllTimers = () => {
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
-  };
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSpin = () => {
     if (phase === "spinning") return;
-
-    // Pick finals
     const roll = Math.random();
     let r0: number, r1: number, r2: number;
-
     if (roll < 0.04) {
       const idx = Math.floor(Math.random() * N);
       r0 = r1 = r2 = idx;
     } else if (roll < 0.10) {
-      if (Math.random() < 0.5) {
-        [r0, r1, r2] = [CONAN_IDX, CONAN_IDX, HAIBARA_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
-      } else {
-        [r0, r1, r2] = [HAIBARA_IDX, HAIBARA_IDX, CONAN_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
-      }
+      const pair = Math.random() < 0.5
+        ? [CONAN_IDX, CONAN_IDX, HAIBARA_IDX]
+        : [HAIBARA_IDX, HAIBARA_IDX, CONAN_IDX];
+      [r0, r1, r2] = pair.sort(() => Math.random() - 0.5) as [number, number, number];
     } else if (roll < 0.16) {
-      if (Math.random() < 0.5) {
-        [r0, r1, r2] = [CONAN_IDX, CONAN_IDX, HEIJI_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
-      } else {
-        [r0, r1, r2] = [HEIJI_IDX, HEIJI_IDX, CONAN_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
-      }
+      const pair = Math.random() < 0.5
+        ? [CONAN_IDX, CONAN_IDX, HEIJI_IDX]
+        : [HEIJI_IDX, HEIJI_IDX, CONAN_IDX];
+      [r0, r1, r2] = pair.sort(() => Math.random() - 0.5) as [number, number, number];
     } else if (roll < 0.22) {
-      if (Math.random() < 0.5) {
-        [r0, r1, r2] = [CONAN_IDX, CONAN_IDX, KID_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
-      } else {
-        [r0, r1, r2] = [KID_IDX, KID_IDX, CONAN_IDX].sort(() => Math.random() - 0.5) as [number, number, number];
-      }
+      const pair = Math.random() < 0.5
+        ? [CONAN_IDX, CONAN_IDX, KID_IDX]
+        : [KID_IDX, KID_IDX, CONAN_IDX];
+      [r0, r1, r2] = pair.sort(() => Math.random() - 0.5) as [number, number, number];
     } else if (roll < 0.40) {
       r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
-      r2 = Math.random() < 0.5 ? r0 : r1;
-      [r0, r1, r2] = [r0, r1, r2].sort(() => Math.random() - 0.5) as [number, number, number];
+      r2 = r0;
     } else {
       r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
       do { r2 = Math.floor(Math.random() * N); } while (r2 === r0 || r2 === r1);
     }
-
     setFinals([r0, r1, r2]);
     setResult(null);
-    stoppedCount.current = 0;
     setPhase("spinning");
-    setSpinCount((c) => c + 1);
-    clearAllTimers();
-
-    // Start all 3 reels simultaneously
-    setReelActive([true, true, true]);
-    setReelShouldStop([false, false, false]);
-
-    // Stop all 3 at exactly the same time (2.5s)
-    const t0 = setTimeout(() => setReelShouldStop([true, true, true]), 2500);
-    timersRef.current = [t0];
+    setSpinning(true);
+    setSpinCount(c => c + 1);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setSpinning(false);
+      setPhase("result");
+    }, 1500);
   };
 
-  const handleReelStopped = useCallback(() => {
-    stoppedCount.current += 1;
-    if (stoppedCount.current >= 3) {
-      setPhase("result");
-    }
-  }, []);
-
   useEffect(() => {
-    if (phase === "result") {
-      setResult(getResult(finals));
-      setReelActive([false, false, false]);
-    }
+    if (phase === "result") setResult(getResult(finals));
   }, [phase, finals]);
 
-  // Cleanup on unmount
-  useEffect(() => () => clearAllTimers(), []);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
   return (
     <div style={{
-      width: "100vw",
-      height: "100vh",
+      minHeight: "100vh",
+      background: "radial-gradient(ellipse at center, #3a0a0a 0%, #1a0505 60%, #0d0202 100%)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      background: "radial-gradient(ellipse at center, #1a0500 0%, #0a0200 100%)",
-      fontFamily: "'Noto Sans TC', sans-serif",
-      overflow: "hidden",
+      fontFamily: "'Noto Serif JP', serif",
     }}>
       <div style={{
-        width: "min(92vw, 520px)",
-        background: "linear-gradient(160deg, #2a0a00 0%, #1a0500 60%, #0f0300 100%)",
-        borderRadius: "24px",
-        border: "3px solid #c8860a",
-        boxShadow: "0 0 60px rgba(200,134,10,0.4), 0 0 120px rgba(200,134,10,0.15), inset 0 0 40px rgba(0,0,0,0.7)",
-        padding: "28px 24px 24px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "20px",
+        background: "linear-gradient(160deg, #2d1a0a 0%, #1a0d05 100%)",
+        border: "3px solid #8b6914",
+        borderRadius: "20px",
+        padding: "32px 28px 28px",
+        boxShadow: "0 0 60px rgba(180,120,0,0.4), 0 0 120px rgba(180,80,0,0.2), inset 0 1px 0 rgba(255,200,80,0.15)",
         position: "relative",
+        display: "inline-block",
       }}>
-        {/* Corner diamonds */}
         {[
-          { top: "12px", left: "12px" },
-          { top: "12px", right: "12px" },
-          { bottom: "12px", left: "12px" },
-          { bottom: "12px", right: "12px" },
+          { top: "10px", left: "14px" },
+          { top: "10px", right: "14px" },
+          { bottom: "10px", left: "14px" },
+          { bottom: "10px", right: "14px" },
         ].map((pos, i) => (
           <div key={i} style={{
-            position: "absolute",
-            width: "10px", height: "10px",
-            background: "#c8860a",
-            transform: "rotate(45deg)",
-            boxShadow: "0 0 6px rgba(200,134,10,0.8)",
-            ...pos,
+            position: "absolute", ...pos,
+            width: "8px", height: "8px",
+            background: "#c8a020", borderRadius: "50%",
+            boxShadow: "0 0 6px #ffd700",
           }} />
         ))}
 
-        {/* Title */}
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <div style={{
-            fontSize: "clamp(18px, 5vw, 26px)",
-            fontWeight: "900",
+            fontSize: "clamp(22px, 5vw, 30px)",
+            fontWeight: "bold",
             color: "#ffd700",
-            textShadow: "0 0 20px rgba(255,215,0,0.9), 0 0 40px rgba(255,215,0,0.4), 0 2px 4px rgba(0,0,0,0.9)",
-            letterSpacing: "0.12em",
-            lineHeight: 1,
-          }}>
-            名探偵コナン
-          </div>
+            textShadow: "0 0 20px rgba(255,215,0,0.6), 0 2px 4px rgba(0,0,0,0.8)",
+            letterSpacing: "0.1em",
+          }}>名探偵コナン</div>
           <div style={{
-            fontSize: "clamp(9px, 2.5vw, 11px)",
-            color: "#c8860a",
-            letterSpacing: "0.4em",
-            marginTop: "6px",
-            textTransform: "uppercase",
-            opacity: 0.9,
-          }}>
-            SLOT MACHINE
-          </div>
+            fontSize: "11px", color: "#c8a020",
+            letterSpacing: "0.35em", marginTop: "4px", opacity: 0.8,
+          }}>SLOT MACHINE</div>
         </div>
 
-        <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, #c8860a, transparent)", opacity: 0.6 }} />
-
-        {/* Reels */}
         <div style={{
           display: "flex",
-          gap: "3%",
           justifyContent: "center",
           alignItems: "center",
-          padding: "4px 0",
+          gap: "12px",
+          marginBottom: "20px",
+          padding: "16px 14px",
+          background: "rgba(0,0,0,0.3)",
+          borderRadius: "12px",
+          border: "1px solid rgba(200,134,10,0.3)",
         }}>
-          {([0, 1, 2] as const).map((i) => (
-            <Reel
-              key={`reel-${i}`}
-              active={reelActive[i]}
-              shouldStop={reelShouldStop[i]}
-              finalIndex={finals[i]}
-              initOffset={i * 10}
-              onStopped={handleReelStopped}
-            />
+          {([0, 1, 2] as const).map(i => (
+            <Reel key={i} spinning={spinning} finalIndex={finals[i]} reelIndex={i} />
           ))}
         </div>
 
-        <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, #c8860a, transparent)", opacity: 0.6 }} />
-
-        {/* Result */}
-        <div style={{ minHeight: "28px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {result ? (
-            <div style={{
-              fontSize: "clamp(14px, 4vw, 18px)",
-              fontWeight: "700",
+        <div style={{
+          textAlign: "center",
+          height: "30px",
+          marginBottom: "16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}>
+          {phase === "spinning" && (
+            <span style={{ color: "#c8a020", fontSize: "14px", opacity: 0.7 }}>轉動中…</span>
+          )}
+          {phase === "result" && result && (
+            <span style={{
               color: result.color,
-              textShadow: `0 0 12px ${result.color}88`,
-              letterSpacing: "0.08em",
-            }}>
-              {result.msg}
-            </div>
-          ) : phase === "idle" ? (
-            <div style={{ fontSize: "clamp(11px, 3vw, 13px)", color: "#8a6030", opacity: 0.7, letterSpacing: "0.1em" }}>
-              按下 SPIN 開始
-            </div>
-          ) : null}
+              fontSize: "20px",
+              fontWeight: "bold",
+              textShadow: `0 0 14px ${result.color}`,
+            }}>{result.msg}</span>
+          )}
+          {phase === "idle" && (
+            <span style={{ color: "#8b6914", fontSize: "13px", opacity: 0.6 }}>按下 SPIN 開始</span>
+          )}
         </div>
 
-        {/* Spin count */}
-        {spinCount > 0 && (
-          <div style={{
-            position: "absolute",
-            top: "16px",
-            right: "28px",
-            background: "#ffd700",
-            color: "#1a0500",
-            fontSize: "11px",
-            fontWeight: "800",
-            borderRadius: "4px",
-            padding: "2px 6px",
-            letterSpacing: "0.05em",
-          }}>
-            {spinCount}
-          </div>
-        )}
-
-        {/* SPIN button */}
         <button
           onClick={handleSpin}
           disabled={phase === "spinning"}
           style={{
             width: "100%",
             padding: "14px",
-            fontSize: "clamp(14px, 4vw, 17px)",
-            fontWeight: "800",
-            letterSpacing: "0.25em",
-            color: phase === "spinning" ? "#8a6030" : "#fff8ee",
+            fontSize: "18px",
+            fontWeight: "bold",
+            letterSpacing: "0.2em",
+            color: phase === "spinning" ? "#888" : "#fff",
             background: phase === "spinning"
-              ? "linear-gradient(180deg, #3a1500 0%, #2a0a00 100%)"
-              : "linear-gradient(180deg, #e03000 0%, #a02000 100%)",
-            border: `2px solid ${phase === "spinning" ? "#5a3010" : "#ff6030"}`,
-            borderRadius: "12px",
+              ? "linear-gradient(180deg, #555 0%, #333 100%)"
+              : "linear-gradient(180deg, #e03020 0%, #a01808 50%, #c02010 100%)",
+            border: "none",
+            borderRadius: "10px",
             cursor: phase === "spinning" ? "not-allowed" : "pointer",
-            boxShadow: phase === "spinning" ? "none" : "0 4px 20px rgba(200,50,0,0.5), inset 0 1px 0 rgba(255,150,100,0.3)",
-            transition: "all 0.2s",
-            outline: "none",
+            boxShadow: phase === "spinning"
+              ? "none"
+              : "0 4px 0 #6a0f08, 0 0 20px rgba(220,50,30,0.4)",
+            transition: "all 0.15s",
           }}
         >
           {phase === "spinning" ? "轉動中…" : "SPIN"}
         </button>
+
+        {spinCount > 0 && (
+          <div style={{
+            position: "absolute", top: "10px", right: "14px",
+            background: "#1a0d05",
+            border: "1px solid #8b6914",
+            borderRadius: "50%",
+            width: "28px", height: "28px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "11px", color: "#c8a020",
+          }}>{spinCount}</div>
+        )}
       </div>
     </div>
   );

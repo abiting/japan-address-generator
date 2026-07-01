@@ -4,34 +4,35 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 const CHARS = [
-  "/manus-storage/char_01_33dac3d4.png", // 0: 柯南
-  "/manus-storage/char_02_d4584850.png", // 1: 灰原哀
-  "/manus-storage/char_03_07d9a06f.png",
-  "/manus-storage/char_04_4165b050.png",
-  "/manus-storage/char_05_be69ca1c.png",
-  "/manus-storage/char_06_f13c70c8.png",
-  "/manus-storage/char_07_11a54e12.png",
-  "/manus-storage/char_08_198aca11.png",
-  "/manus-storage/char_09_16b8b72c.png",
-  "/manus-storage/char_10_25d5aa55.png",
-  "/manus-storage/char_11_dc466816.png",
-  "/manus-storage/char_12_e0bda61d.png",
-  "/manus-storage/char_13_e5f7d8de.png",
-  "/manus-storage/char_14_fd247f49.png",
-  "/manus-storage/char_15_3c87881a.png",
-  "/manus-storage/char_16_4b6e6bb3.png",
-  "/manus-storage/char_17_09794325.png",
-  "/manus-storage/char_18_d04eaf3e.png",
-  "/manus-storage/char_19_df56d9ac.png",
-  "/manus-storage/char_20_71431944.png",
-  "/manus-storage/char_21_4a4289fb.png",
-  "/manus-storage/char_22_c2e72d2a.png",
-  "/manus-storage/char_23_ca614bcc.png",
-  "/manus-storage/char_24_32d5dbe4.png",
-  "/manus-storage/char_26_94016d92.png",
-  "/manus-storage/char_27_a2d6ba4d.png",
-  "/manus-storage/char_28_8ac90b5a.png",
-  "/manus-storage/char_29_c8fb8b34.png",
+  "/manus-storage/char_01_22802bad.png", // 0: 柯南
+  "/manus-storage/char_02_defeba6e.png", // 1: 灰原哀
+  "/manus-storage/char_03_cf9da978.png",
+  "/manus-storage/char_04_f6244eb9.png",
+  "/manus-storage/char_05_0bb16693.png",
+  "/manus-storage/char_06_ea6d16a8.png",
+  "/manus-storage/char_07_c6f0c306.png",
+  "/manus-storage/char_08_eb63908f.png",
+  "/manus-storage/char_09_531ed1ef.png",
+  "/manus-storage/char_10_0cb12083.png",
+  "/manus-storage/char_11_14d85704.png",
+  "/manus-storage/char_12_c9064d6a.png",
+  "/manus-storage/char_13_2e259fda.png",
+  "/manus-storage/char_14_fdcfa790.png",
+  "/manus-storage/char_15_9c2b6cd1.png",
+  "/manus-storage/char_16_3c7c5659.png",
+  "/manus-storage/char_17_7cac8e87.png",
+  "/manus-storage/char_18_32331d7c.png",
+  "/manus-storage/char_19_4cebc8d2.png",
+  "/manus-storage/char_20_8bf8739f.png",
+  "/manus-storage/char_21_87ee92fd.png",
+  "/manus-storage/char_22_9884c1cb.png",
+  "/manus-storage/char_23_eb5902d0.png",
+  "/manus-storage/char_24_8500d1c8.png",
+  "/manus-storage/char_26_3fdd9a8c.png",
+  "/manus-storage/char_27_6f01b778.png",
+  "/manus-storage/char_28_9518c0e0.png",
+  "/manus-storage/char_29_db5d987a.png",
+  "/manus-storage/char_30_fd8923f7.png",
 ];
 
 const N = CHARS.length; // 28
@@ -108,17 +109,21 @@ function Reel({ spinning, targetIndex, stopDelay, onStopped }: ReelProps) {
     phaseRef.current = "fast";
     startTimeRef.current = performance.now();
 
-    const FAST_PX_MS = 1.0;   // px per ms
+    const FAST_PX_MS = 1.2;   // px per ms — constant full speed
     const DECEL_MS   = 900;   // deceleration duration
+    let lastTime = performance.now();
 
     const loop = (now: number) => {
       const cellH = cellHRef.current;
-      if (cellH <= 0) { rafRef.current = requestAnimationFrame(loop); return; }
+      if (cellH <= 0) { lastTime = now; rafRef.current = requestAnimationFrame(loop); return; }
 
+      const dt = now - lastTime;
+      lastTime = now;
       const elapsed = now - startTimeRef.current;
 
       if (phaseRef.current === "fast") {
-        cumulativePxRef.current = elapsed * FAST_PX_MS;
+        // Advance by fixed delta each frame — starts at full speed immediately
+        cumulativePxRef.current += dt * FAST_PX_MS;
         applyTranslate(cumulativePxRef.current);
 
         if (elapsed >= stopDelay) {

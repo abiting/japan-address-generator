@@ -72,13 +72,14 @@ function getResult(r: [number, number, number]): { msg: string; color: string } 
 interface ReelProps {
   spinning: boolean;
   finalIndex: number;
+  startDelay: number;  // ms after spinStartTime to begin spinning
   stopDelay: number;   // ms after spinStartTime to begin stopping
   spinStartTime: number; // absolute timestamp when spin started
   reelOffset: number; // starting offset so each reel shows different chars
   onStopped: () => void;
 }
 
-function Reel({ spinning, finalIndex, stopDelay, spinStartTime, reelOffset, onStopped }: ReelProps) {
+function Reel({ spinning, finalIndex, startDelay, stopDelay, spinStartTime, reelOffset, onStopped }: ReelProps) {
   // curIdx: the image currently shown (top cell)
   // nextIdx: the image scrolling into view (bottom cell)
   const [curIdx, setCurIdx] = useState(0);
@@ -130,15 +131,21 @@ function Reel({ spinning, finalIndex, stopDelay, spinStartTime, reelOffset, onSt
       shouldStopRef.current = true;
     }, remaining);
 
-    // Start first tick immediately
-    scheduleTick(0);
+    // Delay start so each reel begins spinning at the right time
+    const startRemaining = Math.max(0, spinStartTime + startDelay - Date.now());
+    const startTimer = setTimeout(() => {
+      if (!spinningRef.current) return;
+      scheduleTick(0);
+    }, startRemaining);
 
     return () => {
+      clearTimeout(startTimer);
       clearTimeout(stopTimer);
       if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
     };
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spinning, stopDelay, spinStartTime]);
+  }, [spinning, startDelay, stopDelay, spinStartTime]);
 
   // When animation ends (transitionend equivalent via timeout)
   // We use a timeout matching the CSS transition duration instead of onTransitionEnd
@@ -337,8 +344,12 @@ export default function SlotMachine() {
     if (gameState === "result") setResult(getResult(finals));
   }, [gameState, finals]);
 
-  // Stop delays relative to spinStartTime: left 2.5s, mid 3.5s, right 4.5s
-  const stopDelays = [2500, 3500, 4500];
+  // Each reel: startDelay + spinDuration = stopDelay (same spin duration ~2.5s)
+  // left: start 0ms, stop 2500ms
+  // mid:  start 400ms, stop 2900ms
+  // right: start 800ms, stop 3300ms
+  const startDelays = [0, 400, 800];
+  const stopDelays = [2500, 2900, 3300];
 
   return (
     <div style={{
@@ -419,6 +430,7 @@ export default function SlotMachine() {
               key={`${spinKey}-${i}`}
               spinning={gameState === "spinning"}
               finalIndex={finals[i]}
+              startDelay={startDelays[i]}
               stopDelay={stopDelays[i]}
               spinStartTime={spinStartTime}
               reelOffset={i * 10} // each reel starts 10 chars apart

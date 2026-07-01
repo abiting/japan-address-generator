@@ -72,11 +72,13 @@ function getResult(r: [number, number, number]): { msg: string; color: string } 
 interface ReelProps {
   spinning: boolean;
   finalIndex: number;
-  stopDelay: number;
+  stopDelay: number;   // ms after spinStartTime to begin stopping
+  spinStartTime: number; // absolute timestamp when spin started
+  reelOffset: number; // starting offset so each reel shows different chars
   onStopped: () => void;
 }
 
-function Reel({ spinning, finalIndex, stopDelay, onStopped }: ReelProps) {
+function Reel({ spinning, finalIndex, stopDelay, spinStartTime, reelOffset, onStopped }: ReelProps) {
   // curIdx: the image currently shown (top cell)
   // nextIdx: the image scrolling into view (bottom cell)
   const [curIdx, setCurIdx] = useState(0);
@@ -115,17 +117,18 @@ function Reel({ spinning, finalIndex, stopDelay, onStopped }: ReelProps) {
     setStopped(false);
     setAnimating(false);
 
-    // Start from a random position
-    const start = Math.floor(Math.random() * N);
+    // Start from offset-based position so each reel shows different chars
+    const start = (Math.floor(Math.random() * N) + reelOffset) % N;
     curIdxRef.current = start;
     nextIdxRef.current = (start + 1) % N;
     setCurIdx(start);
     setNextIdx((start + 1) % N);
 
-    // Schedule stop after stopDelay
+    // Schedule stop based on absolute spinStartTime so all reels share the same reference
+    const remaining = Math.max(0, spinStartTime + stopDelay - Date.now());
     const stopTimer = setTimeout(() => {
       shouldStopRef.current = true;
-    }, stopDelay);
+    }, remaining);
 
     // Start first tick immediately
     scheduleTick(0);
@@ -135,7 +138,7 @@ function Reel({ spinning, finalIndex, stopDelay, onStopped }: ReelProps) {
       if (tickTimerRef.current) clearTimeout(tickTimerRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spinning, stopDelay]);
+  }, [spinning, stopDelay, spinStartTime]);
 
   // When animation ends (transitionend equivalent via timeout)
   // We use a timeout matching the CSS transition duration instead of onTransitionEnd
@@ -164,7 +167,7 @@ function Reel({ spinning, finalIndex, stopDelay, onStopped }: ReelProps) {
         return;
       }
 
-      // Continue spinning: reset position and advance
+      // Continue spinning: advance by 1 step (always 1 for smooth scroll)
       curIdxRef.current = newCur;
       nextIdxRef.current = newNext;
       setCurIdx(newCur);
@@ -265,6 +268,7 @@ export default function SlotMachine() {
   const [finals, setFinals] = useState<[number, number, number]>([CONAN_IDX, CONAN_IDX, CONAN_IDX]);
   const [result, setResult] = useState<{ msg: string; color: string } | null>(null);
   const [spinKey, setSpinKey] = useState(0);
+  const [spinStartTime, setSpinStartTime] = useState(0);
   const stoppedCount = useRef(0);
 
   const handleSpin = () => {
@@ -315,9 +319,11 @@ export default function SlotMachine() {
       do { r2 = Math.floor(Math.random() * N); } while (r2 === r0 || r2 === r1);
     }
 
+    const now = Date.now();
     setFinals([r0, r1, r2]);
     setResult(null);
     stoppedCount.current = 0;
+    setSpinStartTime(now);
     setGameState("spinning");
     setSpinKey((k) => k + 1);
   };
@@ -331,7 +337,7 @@ export default function SlotMachine() {
     if (gameState === "result") setResult(getResult(finals));
   }, [gameState, finals]);
 
-  // Stop delays: reel 1 stops first, then 2, then 3 (total ~5s)
+  // Stop delays relative to spinStartTime: left 2.5s, mid 3.5s, right 4.5s
   const stopDelays = [2500, 3500, 4500];
 
   return (
@@ -414,6 +420,8 @@ export default function SlotMachine() {
               spinning={gameState === "spinning"}
               finalIndex={finals[i]}
               stopDelay={stopDelays[i]}
+              spinStartTime={spinStartTime}
+              reelOffset={i * 10} // each reel starts 10 chars apart
               onStopped={handleReelStopped}
             />
           ))}

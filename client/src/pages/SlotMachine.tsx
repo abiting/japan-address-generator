@@ -40,17 +40,28 @@ const CHARS: { src: string; name: string }[] = [
 ];
 
 const N = CHARS.length;
-const CONAN_IDX = 0;
-const HAIBARA_IDX = 29;
+const CONAN_IDX = 0;     // sticker_1
+const HAIBARA_IDX = 29;  // haibara
+const HEIJI_IDX = 8;     // sticker_10 (平次) — 0-based index in CHARS
+const KID_IDX = 12;      // sticker_14 (基德) — 0-based index in CHARS
 
 function getResult(r: [number, number, number]): { msg: string; color: string } {
   const [a, b, c] = r;
-  if (a === b && b === c) return { msg: "🎉 恭喜中獎！", color: "#ffd700" };
+  if (a === b && b === c) return { msg: "恭喜中獎！", color: "#ffd700" };
   const conanCount = r.filter((x) => x === CONAN_IDX).length;
   const haibaraCount = r.filter((x) => x === HAIBARA_IDX).length;
+  const heijiCount = r.filter((x) => x === HEIJI_IDX).length;
+  const kidCount = r.filter((x) => x === KID_IDX).length;
+  // 柯哀好嗑：三格只有柯南和小哀（2+1 或 1+2）
   if (conanCount + haibaraCount === 3 && conanCount >= 1 && haibaraCount >= 1)
-    return { msg: "💕 柯哀好嗑！", color: "#ffb3d9" };
-  if (a === b || b === c || a === c) return { msg: "✨ 運氣不錯！", color: "#90ee90" };
+    return { msg: "柯哀好嗑！", color: "#ffb3d9" };
+  // 基友無敵：三格只有柯南和平次（2+1 或 1+2）
+  if (conanCount + heijiCount === 3 && conanCount >= 1 && heijiCount >= 1)
+    return { msg: "基友無敵！", color: "#ffa040" };
+  // 兄弟齊心：三格只有柯南和基德（2+1 或 1+2）
+  if (conanCount + kidCount === 3 && conanCount >= 1 && kidCount >= 1)
+    return { msg: "兄弟齊心！", color: "#80d0ff" };
+  if (a === b || b === c || a === c) return { msg: "運氣不錯！", color: "#90ee90" };
   return { msg: "再接再厲！", color: "#ffaaaa" };
 }
 
@@ -116,8 +127,8 @@ function Reel({ spinning, finalIndex, stopDelay, onStopped }: ReelProps) {
       shouldStopRef.current = true;
     }, stopDelay);
 
-    // Start first tick after short delay
-    scheduleTick(80);
+    // Start first tick immediately
+    scheduleTick(0);
 
     return () => {
       clearTimeout(stopTimer);
@@ -160,10 +171,10 @@ function Reel({ spinning, finalIndex, stopDelay, onStopped }: ReelProps) {
       setNextIdx(newNext);
       setAnimating(false); // reset to top instantly
 
-      // Schedule next tick — speed up at start, slow down at end
-      const delay = shouldStopRef.current ? 180 : 90;
+      // Schedule next tick — fast spin, slow down when about to stop
+      const delay = shouldStopRef.current ? 80 : 30;
       scheduleTick(delay);
-    }, 150); // must match CSS transition duration
+    }, 60); // must match CSS transition duration
 
     return () => clearTimeout(t);
   }, [animating, onStopped, scheduleTick]);
@@ -212,7 +223,7 @@ function Reel({ spinning, finalIndex, stopDelay, onStopped }: ReelProps) {
           display: "flex",
           flexDirection: "column",
           transform: animating ? "translateY(-50%)" : "translateY(0)",
-          transition: animating ? "transform 150ms linear" : "none",
+          transition: animating ? "transform 60ms linear" : "none",
           willChange: "transform",
         }}
       >
@@ -274,7 +285,25 @@ export default function SlotMachine() {
         const arr = [HAIBARA_IDX, HAIBARA_IDX, CONAN_IDX].sort(() => Math.random() - 0.5);
         [r0, r1, r2] = arr as [number, number, number];
       }
-    } else if (roll < 0.30) {
+    } else if (roll < 0.16) {
+      // 基友無敵：柯南+平次 2+1 or 1+2
+      if (Math.random() < 0.5) {
+        const arr = [CONAN_IDX, CONAN_IDX, HEIJI_IDX].sort(() => Math.random() - 0.5);
+        [r0, r1, r2] = arr as [number, number, number];
+      } else {
+        const arr = [HEIJI_IDX, HEIJI_IDX, CONAN_IDX].sort(() => Math.random() - 0.5);
+        [r0, r1, r2] = arr as [number, number, number];
+      }
+    } else if (roll < 0.22) {
+      // 兄弟齊心：柯南+基德 2+1 or 1+2
+      if (Math.random() < 0.5) {
+        const arr = [CONAN_IDX, CONAN_IDX, KID_IDX].sort(() => Math.random() - 0.5);
+        [r0, r1, r2] = arr as [number, number, number];
+      } else {
+        const arr = [KID_IDX, KID_IDX, CONAN_IDX].sort(() => Math.random() - 0.5);
+        [r0, r1, r2] = arr as [number, number, number];
+      }
+    } else if (roll < 0.40) {
       r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
       r2 = Math.random() < 0.5 ? r0 : r1;
@@ -302,8 +331,8 @@ export default function SlotMachine() {
     if (gameState === "result") setResult(getResult(finals));
   }, [gameState, finals]);
 
-  // Stop delays: reel 1 stops first, then 2, then 3
-  const stopDelays = [1200, 2000, 2800];
+  // Stop delays: reel 1 stops first, then 2, then 3 (total ~5s)
+  const stopDelays = [2500, 3500, 4500];
 
   return (
     <div style={{

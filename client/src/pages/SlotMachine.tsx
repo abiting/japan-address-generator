@@ -1,53 +1,43 @@
-// Slot Machine — Detective Conan Edition
-// Rewrite v3: CSS transition-based snap for pixel-perfect stop + instant full speed
+// Slot Machine v8 — CSS animation approach
+// Strategy:
+// 1. Each reel has a strip of N*COPIES cells
+// 2. During spin: CSS keyframe animation scrolls from 0 to -N*cellH (one full loop), infinite
+// 3. On stop: pause animation, read computed translateY, calculate snap target, apply CSS transition
+// 4. On next spin: resume from snapped position (no jump)
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
 const CHARS = [
-  "/manus-storage/char_01_22802bad.png", // 0: 柯南
-  "/manus-storage/char_02_defeba6e.png", // 1: 灰原哀
-  "/manus-storage/char_03_cf9da978.png",
-  "/manus-storage/char_04_99a8e9d5.png",
-  "/manus-storage/char_05_0bb16693.png",
-  "/manus-storage/char_06_ea6d16a8.png",
-  "/manus-storage/char_07_c6f0c306.png",
-  "/manus-storage/char_08_eb63908f.png",
-  "/manus-storage/char_09_531ed1ef.png",
-  "/manus-storage/char_10_0cb12083.png",
-  "/manus-storage/char_11_14d85704.png",
-  "/manus-storage/char_12_c9064d6a.png",
-  "/manus-storage/char_13_2e259fda.png",
-  "/manus-storage/char_14_fdcfa790.png",
-  "/manus-storage/char_15_9c2b6cd1.png",
-  "/manus-storage/char_16_3c7c5659.png",
-  "/manus-storage/char_17_7cac8e87.png",
-  "/manus-storage/char_18_32331d7c.png",
-  "/manus-storage/char_19_4cebc8d2.png",
-  "/manus-storage/char_20_8bf8739f.png",
-  "/manus-storage/char_21_87ee92fd.png",
-  "/manus-storage/char_22_9884c1cb.png",
-  "/manus-storage/char_23_eb5902d0.png",
-  "/manus-storage/char_24_8500d1c8.png",
-  "/manus-storage/char_26_3fdd9a8c.png",
-  "/manus-storage/char_27_6f01b778.png",
-  "/manus-storage/char_28_9518c0e0.png",
-  "/manus-storage/char_29_db5d987a.png",
-  "/manus-storage/char_30_fd8923f7.png",
+  "/manus-storage/new_char_01_251fa438.png",
+  "/manus-storage/new_char_02_45161b3b.png",
+  "/manus-storage/new_char_03_8ada82a4.png",
+  "/manus-storage/new_char_04_9cae5d50.png",
+  "/manus-storage/new_char_05_b7b01a6a.png",
+  "/manus-storage/new_char_06_b0942a74.png",
+  "/manus-storage/new_char_07_d55f23d7.png",
+  "/manus-storage/new_char_08_43882b68.png",
+  "/manus-storage/new_char_09_0c094d18.png",
+  "/manus-storage/new_char_10_d9f3f062.png",
+  "/manus-storage/new_char_11_9602a36b.png",
+  "/manus-storage/new_char_12_61cac6e2.png",
+  "/manus-storage/new_char_13_52bd027e.png",
+  "/manus-storage/new_char_14_bf49a4b6.png",
+  "/manus-storage/new_char_15_a93e3530.png",
+  "/manus-storage/new_char_16_72485dcd.png",
+  "/manus-storage/new_char_17_74b471d5.png",
+  "/manus-storage/new_char_18_70b6a132.png",
+  "/manus-storage/new_char_19_2c316fa2.png",
+  "/manus-storage/new_char_20_b005ba88.png",
+  "/manus-storage/new_char_21_498b56f3.png",
+  "/manus-storage/new_char_22_1d886615.png",
+  "/manus-storage/new_char_23_eb7af15d.png",
+  "/manus-storage/new_char_24_33fbcca5.png",
 ];
 
-const N = CHARS.length; // 29
+const N = CHARS.length; // 24
 const CONAN_IDX = 0;
-const HAIBARA_IDX = 1;
-
-// Strip layout: we render 3 copies of the full list.
-// Copy 0: indices 0..N-1
-// Copy 1: indices N..2N-1   ← we spin INTO this copy
-// Copy 2: indices 2N..3N-1
-// During spin we animate translateY at constant speed using RAF.
-// When stop is triggered we compute the exact px for targetIndex in copy 1 (or 2),
-// then use a CSS cubic-bezier transition to snap there precisely.
-const COPIES = 3;
-const TOTAL = N * COPIES;
+const HAIBARA_IDX = 3;
+const COPIES = 6; // 6 * 24 = 144 cells
 
 function getResult(r: [number, number, number]): { msg: string; color: string } {
   const [a, b, c] = r;
@@ -60,128 +50,130 @@ function getResult(r: [number, number, number]): { msg: string; color: string } 
   return { msg: "再接再厲！", color: "#ffaaaa" };
 }
 
+// Parse translateY from computed matrix transform
+function getTranslateY(el: HTMLElement): number {
+  const style = window.getComputedStyle(el);
+  const transform = style.transform;
+  if (!transform || transform === "none") return 0;
+  // matrix(a,b,c,d,tx,ty) or matrix3d(...)
+  const match = transform.match(/matrix(?:3d)?\(([^)]+)\)/);
+  if (!match) return 0;
+  const values = match[1].split(",").map(parseFloat);
+  // For matrix: ty is index 5; for matrix3d: ty is index 13
+  return values.length === 6 ? values[5] : values[13];
+}
+
 interface ReelProps {
-  spinning: boolean;
+  reelId: string;
+  spinTrigger: number;
   targetIndex: number;
-  stopDelay: number;   // ms after spin starts to begin decel
+  stopDelay: number;
   onStopped: () => void;
 }
 
-function Reel({ spinning, targetIndex, stopDelay, onStopped }: ReelProps) {
+function Reel({ reelId, spinTrigger, targetIndex, stopDelay, onStopped }: ReelProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef(0);
-  const startTimeRef = useRef(0);
-  const currentPxRef = useRef(0);   // current translateY magnitude (positive = scrolled down)
-  const stoppedRef = useRef(false);
-  const cellHRef = useRef(0);
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Current offset in px (negative = scrolled down), always a multiple of cellH
+  const currentOffsetRef = useRef(0);
 
-  // Measure cell height
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    const update = () => { cellHRef.current = el.clientHeight; };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const getCellH = () => wrapperRef.current?.clientHeight ?? 0;
 
-  const setTranslate = (px: number, transition = "none") => {
-    const el = stripRef.current;
-    if (!el) return;
-    el.style.transition = transition;
-    el.style.transform = `translateY(${-px}px)`;
+  const clearStop = () => {
+    if (stopTimerRef.current) { clearTimeout(stopTimerRef.current); stopTimerRef.current = null; }
   };
 
   useEffect(() => {
-    if (!spinning) {
-      cancelAnimationFrame(rafRef.current);
-      // Reset strip to top (copy 0, index 0) instantly
-      currentPxRef.current = 0;
-      stoppedRef.current = false;
-      setTranslate(0);
-      return;
+    if (spinTrigger === 0) return;
+    const strip = stripRef.current;
+    if (!strip) return;
+
+    clearStop();
+
+    const cellH = getCellH();
+    if (cellH <= 0) return;
+
+    // Step 1: Freeze current visual position
+    const visualY = getTranslateY(strip);
+    // Snap to nearest cell boundary
+    const snappedY = Math.round(visualY / cellH) * cellH;
+    currentOffsetRef.current = snappedY;
+
+    // Step 2: Remove animation, set transform to snapped position
+    strip.style.transition = "none";
+    strip.style.animation = "none";
+    strip.style.transform = `translateY(${snappedY}px)`;
+
+    // Step 3: Force reflow
+    strip.getBoundingClientRect();
+
+    // Step 4: Start spinning animation
+    // Animation scrolls from snappedY to snappedY - N*cellH over 1.2s, infinite
+    const loopH = N * cellH;
+    const animName = `spin-${reelId}`;
+    // Inject keyframe dynamically
+    let styleEl = document.getElementById(`style-${reelId}`) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = `style-${reelId}`;
+      document.head.appendChild(styleEl);
     }
-
-    // ── Start: position strip so copy 0 is visible (px=0 shows index 0 of copy 0)
-    // We'll spin downward, so translateY goes increasingly negative (px increases).
-    // Start at px = 0 (top of strip).
-    currentPxRef.current = 0;
-    stoppedRef.current = false;
-    setTranslate(0);
-
-    const SPEED = 1.4; // px per ms — fast from frame 1
-    startTimeRef.current = performance.now();
-    let lastTime = performance.now();
-
-    const loop = (now: number) => {
-      const cellH = cellHRef.current;
-      if (cellH <= 0) { lastTime = now; rafRef.current = requestAnimationFrame(loop); return; }
-
-      const elapsed = now - startTimeRef.current;
-      const dt = now - lastTime;
-      lastTime = now;
-
-      if (!stoppedRef.current) {
-        // Advance at constant speed
-        currentPxRef.current += dt * SPEED;
-
-        // Visual wrap: keep within strip bounds to avoid blank space
-        const totalH = cellH * TOTAL;
-        if (currentPxRef.current >= totalH - cellH * N) {
-          // Jump back by N cells (one full copy) — seamless because strip repeats
-          currentPxRef.current -= cellH * N;
-        }
-
-        setTranslate(currentPxRef.current);
-
-        // Time to stop?
-        if (elapsed >= stopDelay) {
-          stoppedRef.current = true;
-
-          // Compute snap target: we want to show targetIndex.
-          // Pick copy 1 (offset = N * cellH) as the landing zone — it's always
-          // reachable since we've been spinning and wrapping within copy 0/1.
-          // Find the nearest occurrence of targetIndex at or ahead of currentPxRef.
-          const targetPxInCopy1 = (N + targetIndex) * cellH;
-
-          // We need targetPx > currentPxRef so we always scroll forward.
-          // If copy 1 is already behind us, use copy 2.
-          let snapPx = targetPxInCopy1;
-          if (snapPx <= currentPxRef.current + cellH * 2) {
-            snapPx = (N * 2 + targetIndex) * cellH;
-          }
-
-          // Decel distance must be at least 2 full loops for visual richness
-          const minExtra = cellH * N * 1; // at least 1 extra loop
-          if (snapPx < currentPxRef.current + minExtra) {
-            snapPx += cellH * N;
-          }
-
-          const decelMs = 900;
-          setTranslate(snapPx, `transform ${decelMs}ms cubic-bezier(0.25, 0.1, 0.25, 1.0)`);
-          currentPxRef.current = snapPx;
-
-          setTimeout(() => {
-            // After transition ends, hard-set to exact pixel (no drift)
-            setTranslate(snapPx, "none");
-            onStopped();
-          }, decelMs + 50);
-
-          return; // stop RAF
-        }
+    styleEl.textContent = `
+      @keyframes ${animName} {
+        from { transform: translateY(${snappedY}px); }
+        to   { transform: translateY(${snappedY - loopH}px); }
       }
+    `;
 
-      rafRef.current = requestAnimationFrame(loop);
-    };
+    strip.style.animation = `${animName} 1.2s linear infinite`;
 
-    rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
+    // Step 5: After stopDelay, snap to target
+    stopTimerRef.current = setTimeout(() => {
+      const cellH2 = getCellH();
+      if (cellH2 <= 0) { onStopped(); return; }
+
+      // Read current visual position from computed style
+      const currentY = getTranslateY(strip);
+      const snappedCurrent = Math.round(currentY / cellH2) * cellH2;
+      const currentCellIndex = Math.round(-snappedCurrent / cellH2); // positive index
+
+      // Find next occurrence of targetIndex at least MIN_AHEAD cells ahead
+      const MIN_AHEAD = N + 2;
+      const posInLoop = ((currentCellIndex % N) + N) % N;
+      let cellsAhead = (targetIndex - posInLoop + N) % N;
+      if (cellsAhead < MIN_AHEAD) cellsAhead += N * Math.ceil((MIN_AHEAD - cellsAhead) / N);
+
+      const finalCellIndex = currentCellIndex + cellsAhead;
+      // Safety: ensure we don't go past the strip
+      const maxCells = N * COPIES - 1;
+      const safeFinalCellIndex = finalCellIndex > maxCells
+        ? finalCellIndex % N + N * (COPIES - 2)
+        : finalCellIndex;
+
+      const finalY = -safeFinalCellIndex * cellH2;
+      currentOffsetRef.current = finalY;
+
+      // Stop animation and snap with deceleration
+      strip.style.animation = "none";
+      strip.style.transform = `translateY(${snappedCurrent}px)`;
+      strip.getBoundingClientRect();
+
+      const DECEL_MS = 800;
+      strip.style.transition = `transform ${DECEL_MS}ms cubic-bezier(0.2, 0.8, 0.3, 1.0)`;
+      strip.style.transform = `translateY(${finalY}px)`;
+
+      setTimeout(() => {
+        strip.style.transition = "none";
+        onStopped();
+      }, DECEL_MS + 50);
+    }, stopDelay);
+
+    return clearStop;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spinning, targetIndex, stopDelay]);
+  }, [spinTrigger]);
 
-  const cells = Array.from({ length: TOTAL }, (_, i) => CHARS[i % N]);
+  const cells = Array.from({ length: N * COPIES }, (_, i) => CHARS[i % N]);
 
   return (
     <div
@@ -190,29 +182,38 @@ function Reel({ spinning, targetIndex, stopDelay, onStopped }: ReelProps) {
         flex: "none",
         width: "30%",
         aspectRatio: "1 / 1",
-        background: "linear-gradient(180deg, #f5efe0 0%, #ede3cc 50%, #f5efe0 100%)",
+        background: "#f0a07a",
         border: "3px solid #c8860a",
-        borderRadius: "8px",
+        borderRadius: "10px",
         overflow: "hidden",
-        boxShadow: "inset 0 0 12px rgba(0,0,0,0.15), 0 0 8px rgba(200,134,10,0.4)",
+        boxShadow: "inset 0 0 12px rgba(0,0,0,0.2), 0 0 8px rgba(200,134,10,0.4)",
         position: "relative",
       }}
     >
-      {/* Fade masks top/bottom */}
+      {/* Top/bottom fade */}
       <div style={{
         position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
-        background: "linear-gradient(180deg, rgba(245,239,224,0.9) 0%, transparent 25%, transparent 75%, rgba(237,227,204,0.9) 100%)",
+        background: "linear-gradient(180deg, rgba(0,0,0,0.4) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.4) 100%)",
       }} />
-
-      {/* Strip */}
-      <div ref={stripRef} style={{ display: "flex", flexDirection: "column", willChange: "transform" }}>
+      <div
+        ref={stripRef}
+        style={{ display: "flex", flexDirection: "column", willChange: "transform" }}
+      >
         {cells.map((src, i) => (
-          <div key={i} style={{
-            flexShrink: 0, width: "100%", aspectRatio: "1 / 1",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "8%", boxSizing: "border-box",
-          }}>
-            <img src={src} alt="character" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <div
+            key={i}
+            style={{
+              flexShrink: 0,
+              width: "100%",
+              aspectRatio: "1 / 1",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4%",
+              boxSizing: "border-box",
+            }}
+          >
+            <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           </div>
         ))}
       </div>
@@ -220,21 +221,20 @@ function Reel({ spinning, targetIndex, stopDelay, onStopped }: ReelProps) {
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
 type GameState = "idle" | "spinning" | "result";
 
 export default function SlotMachine() {
   const [gameState, setGameState] = useState<GameState>("idle");
   const [finals, setFinals] = useState<[number, number, number]>([0, 1, 2]);
   const [result, setResult] = useState<{ msg: string; color: string } | null>(null);
-  const [spinKey, setSpinKey] = useState(0);
+  const [spinTrigger, setSpinTrigger] = useState(0);
   const stoppedCount = useRef(0);
 
   const handleSpin = () => {
     if (gameState === "spinning") return;
+
     const roll = Math.random();
     let r0: number, r1: number, r2: number;
-
     if (roll < 0.04) {
       r0 = Math.floor(Math.random() * N); r1 = r0; r2 = r0;
     } else if (roll < 0.10) {
@@ -246,6 +246,8 @@ export default function SlotMachine() {
       r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
       r2 = Math.random() < 0.5 ? r0 : r1;
+      const arr = [r0, r1, r2].sort(() => Math.random() - 0.5);
+      [r0, r1, r2] = arr as [number, number, number];
     } else {
       r0 = Math.floor(Math.random() * N);
       do { r1 = Math.floor(Math.random() * N); } while (r1 === r0);
@@ -256,7 +258,7 @@ export default function SlotMachine() {
     setResult(null);
     stoppedCount.current = 0;
     setGameState("spinning");
-    setSpinKey((k) => k + 1);
+    setSpinTrigger((k) => k + 1);
   };
 
   const handleReelStopped = useCallback(() => {
@@ -268,8 +270,7 @@ export default function SlotMachine() {
     if (gameState === "result") setResult(getResult(finals));
   }, [gameState, finals]);
 
-  // Stop delays: reel 0 stops first, then 1, then 2
-  const stopDelays = [800, 1500, 2200];
+  const stopDelays = [900, 1700, 2500];
 
   return (
     <div style={{
@@ -302,23 +303,17 @@ export default function SlotMachine() {
 
         {/* Title */}
         <div style={{ textAlign: "center", lineHeight: 1.2 }}>
-          <div style={{
-            fontSize: "clamp(14px, 4vw, 24px)", fontWeight: "900", color: "#ffd700",
-            textShadow: "0 0 10px rgba(255,215,0,0.8), 0 2px 4px rgba(0,0,0,0.8)",
-            letterSpacing: "0.15em",
-          }}>名探偵コナン</div>
-          <div style={{
-            fontSize: "clamp(9px, 2.5vw, 13px)", color: "#c8860a",
-            letterSpacing: "0.3em", textTransform: "uppercase", marginTop: "3px",
-          }}>SLOT MACHINE</div>
+          <div style={{ fontSize: "clamp(14px, 4vw, 24px)", fontWeight: "900", color: "#ffd700", textShadow: "0 0 10px rgba(255,215,0,0.8), 0 2px 4px rgba(0,0,0,0.8)", letterSpacing: "0.15em" }}>名探偵コナン</div>
+          <div style={{ fontSize: "clamp(9px, 2.5vw, 13px)", color: "#c8860a", letterSpacing: "0.3em", textTransform: "uppercase", marginTop: "3px" }}>SLOT MACHINE</div>
         </div>
 
         {/* Reels */}
         <div style={{ width: "100%", display: "flex", gap: "3%", alignItems: "center", justifyContent: "center" }}>
           {([0, 1, 2] as const).map((i) => (
             <Reel
-              key={`${spinKey}-${i}`}
-              spinning={gameState === "spinning"}
+              key={i}
+              reelId={`reel-${i}`}
+              spinTrigger={spinTrigger}
               targetIndex={finals[i]}
               stopDelay={stopDelays[i]}
               onStopped={handleReelStopped}
@@ -326,7 +321,7 @@ export default function SlotMachine() {
           ))}
         </div>
 
-        {/* SPIN button */}
+        {/* Spin button */}
         <button
           onClick={handleSpin}
           disabled={gameState === "spinning"}
@@ -337,14 +332,11 @@ export default function SlotMachine() {
               : "linear-gradient(180deg, #ff4444 0%, #cc0000 50%, #990000 100%)",
             border: "3px solid",
             borderColor: gameState === "spinning" ? "#666" : "#ff8888",
-            borderRadius: "50px",
-            color: "#fff",
-            fontSize: "clamp(13px, 3.5vw, 18px)", fontWeight: "900",
-            letterSpacing: "0.2em",
+            borderRadius: "50px", color: "#fff",
+            fontSize: "clamp(13px, 3.5vw, 18px)", fontWeight: "900", letterSpacing: "0.2em",
             cursor: gameState === "spinning" ? "not-allowed" : "pointer",
             boxShadow: gameState === "spinning" ? "none" : "0 4px 15px rgba(255,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2)",
-            transition: "all 0.2s ease",
-            fontFamily: "inherit",
+            transition: "all 0.2s ease", fontFamily: "inherit",
           }}
           onMouseEnter={(e) => { if (gameState !== "spinning") (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.04)"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
@@ -352,27 +344,20 @@ export default function SlotMachine() {
           {gameState === "spinning" ? "轉動中…" : "SPIN"}
         </button>
 
-        {/* Result area */}
+        {/* Result */}
         <div style={{ height: "clamp(22px, 5vh, 36px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {result && (
             <div style={{
               fontSize: "clamp(14px, 4vw, 20px)", fontWeight: "800",
-              color: result.color,
-              textShadow: `0 0 14px ${result.color}88`,
-              letterSpacing: "0.1em",
-              animation: "fadeIn 0.4s ease",
+              color: result.color, textShadow: `0 0 14px ${result.color}88`,
+              letterSpacing: "0.1em", animation: "fadeIn 0.4s ease",
             }}>
               {result.msg}
             </div>
           )}
         </div>
 
-        <style>{`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.8); }
-            to   { opacity: 1; transform: scale(1); }
-          }
-        `}</style>
+        <style>{`@keyframes fadeIn { from { opacity:0; transform:scale(0.8); } to { opacity:1; transform:scale(1); } }`}</style>
       </div>
     </div>
   );

@@ -90,10 +90,17 @@ function Reel({ active, shouldStop, finalIndex, initOffset, onStopped }: ReelPro
   const nextIdxRef = useRef((initOffset + 1) % N);
   const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopCountdownRef = useRef(-1); // -1 = not counting; when shouldStop set, counts down from N
 
   // Keep refs in sync
   useEffect(() => { finalIdxRef.current = finalIndex; }, [finalIndex]);
-  useEffect(() => { shouldStopRef.current = shouldStop; }, [shouldStop]);
+  useEffect(() => {
+    shouldStopRef.current = shouldStop;
+    if (shouldStop && stopCountdownRef.current < 0) {
+      // Start countdown: after at most N ticks, force-stop
+      stopCountdownRef.current = N;
+    }
+  }, [shouldStop]);
 
   const clearTimers = useCallback(() => {
     if (tickRef.current) { clearTimeout(tickRef.current); tickRef.current = null; }
@@ -120,14 +127,21 @@ function Reel({ active, shouldStop, finalIndex, initOffset, onStopped }: ReelPro
       const newCur = nextIdxRef.current;
       const newNext = (newCur + 1) % N;
 
-      // Check if we should stop on this frame
-      if (shouldStopRef.current && newCur === finalIdxRef.current) {
-        curIdxRef.current = newCur;
-        nextIdxRef.current = newNext;
-        setCurIdx(newCur);
-        setNextIdx(newNext);
+      // Countdown: decrement each tick after shouldStop is set
+      if (stopCountdownRef.current > 0) stopCountdownRef.current--;
+
+      // Stop if: (a) we reached finalIndex, or (b) countdown expired (force stop)
+      const forceStop = shouldStopRef.current && stopCountdownRef.current === 0;
+      if (shouldStopRef.current && (newCur === finalIdxRef.current || forceStop)) {
+        // If force-stop, snap directly to finalIndex
+        const landIdx = forceStop ? finalIdxRef.current : newCur;
+        curIdxRef.current = landIdx;
+        nextIdxRef.current = (landIdx + 1) % N;
+        setCurIdx(landIdx);
+        setNextIdx((landIdx + 1) % N);
         setAnimating(false);
         activeRef.current = false;
+        stopCountdownRef.current = -1;
         setStopped(true);
         onStopped();
         return;
@@ -152,6 +166,7 @@ function Reel({ active, shouldStop, finalIndex, initOffset, onStopped }: ReelPro
       // Start spinning
       activeRef.current = true;
       shouldStopRef.current = false;
+      stopCountdownRef.current = -1;
       setStopped(false);
       setAnimating(false);
       // Randomize start position
@@ -303,11 +318,9 @@ export default function SlotMachine() {
     setReelActive([true, true, true]);
     setReelShouldStop([false, false, false]);
 
-    // Stop left at 2s, mid at 3s, right at 4s
-    const t0 = setTimeout(() => setReelShouldStop([true, false, false]), 2000);
-    const t1 = setTimeout(() => setReelShouldStop([true, true, false]), 3000);
-    const t2 = setTimeout(() => setReelShouldStop([true, true, true]), 4000);
-    timersRef.current = [t0, t1, t2];
+    // Stop all 3 at exactly the same time (3s)
+    const t0 = setTimeout(() => setReelShouldStop([true, true, true]), 3000);
+    timersRef.current = [t0];
   };
 
   const handleReelStopped = useCallback(() => {

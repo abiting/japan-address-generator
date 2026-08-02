@@ -75,13 +75,13 @@ export default function ChineseConverter() {
           color: "#e2e8f0",
           margin: 0,
           letterSpacing: "0.05em",
-        }}>繁簡轉換 🔁 简繁转换</h1>
+        }}>繁簡中文轉換工具</h1>
         <p style={{
-          fontSize: "13px",
+          fontSize: "14px",
           color: "#94a3b8",
-          marginTop: "8px",
-          letterSpacing: "0.1em",
-        }}>Traditional ↔ Simplified Chinese Converter</p>
+          marginTop: "10px",
+          letterSpacing: "0.05em",
+        }}>繁簡轉換 🔁 简繁转换</p>
       </div>
 
       {/* 模式切換 */}

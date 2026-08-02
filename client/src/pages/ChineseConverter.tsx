@@ -75,9 +75,9 @@ export default function ChineseConverter() {
           color: "#e2e8f0",
           margin: 0,
           letterSpacing: "0.05em",
-        }}>繁簡中文轉換工具</h1>
+        }}>繁簡中文轉換器</h1>
         <p style={{
-          fontSize: "14px",
+          fontSize: "18px",
           color: "#94a3b8",
           marginTop: "10px",
           letterSpacing: "0.05em",

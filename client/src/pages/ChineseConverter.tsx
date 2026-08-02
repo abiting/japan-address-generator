@@ -256,7 +256,7 @@ export default function ChineseConverter() {
           color: "#64748b",
           lineHeight: 1.7,
         }}>
-          使用 <strong style={{ color: "#818cf8" }}>OpenCC</strong> 開放中文轉換引擎，在瀏覽器本地執行，不需要網路連線，輸入內容不會上傳至任何伺服器。
+          本工具在瀏覽器端本地執行，輸入內容絕不上傳至任何伺服器。
         </div>
       </div>
     </div>

@@ -255,6 +255,7 @@ export default function ChineseConverter() {
           fontSize: "13px",
           color: "#64748b",
           lineHeight: 1.7,
+          textAlign: "center",
         }}>
           本工具在瀏覽器端本地執行，輸入內容絕不上傳至任何伺服器。
         </div>

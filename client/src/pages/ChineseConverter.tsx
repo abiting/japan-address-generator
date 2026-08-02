@@ -75,7 +75,7 @@ export default function ChineseConverter() {
           color: "#e2e8f0",
           margin: 0,
           letterSpacing: "0.05em",
-        }}>繁簡轉換</h1>
+        }}>繁簡轉換 🔁 简繁转换</h1>
         <p style={{
           fontSize: "13px",
           color: "#94a3b8",
@@ -127,16 +127,6 @@ export default function ChineseConverter() {
       }}>
         {/* 輸入框 */}
         <div style={{ position: "relative" }}>
-          <label style={{
-            display: "block",
-            fontSize: "12px",
-            color: "#64748b",
-            letterSpacing: "0.12em",
-            marginBottom: "8px",
-            textTransform: "uppercase",
-          }}>
-            {mode === "t2s" ? "繁體中文輸入" : "簡體中文輸入"}
-          </label>
           <textarea
             value={input}
             onChange={e => handleInput(e.target.value)}
@@ -177,30 +167,6 @@ export default function ChineseConverter() {
           gap: "12px",
           flexWrap: "wrap",
         }}>
-          {/* 互換按鈕 */}
-          <button
-            onClick={handleSwap}
-            title="互換方向"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "10px 20px",
-              borderRadius: "10px",
-              border: "1px solid rgba(255,255,255,0.15)",
-              background: "rgba(255,255,255,0.07)",
-              color: "#cbd5e1",
-              fontSize: "14px",
-              cursor: "pointer",
-              transition: "all 0.15s",
-              fontFamily: "inherit",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.13)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.07)"; }}
-          >
-            <span style={{ fontSize: "18px" }}>⇅</span> 互換方向
-          </button>
-
           {/* 清除按鈕 */}
           <button
             onClick={handleClear}
@@ -224,18 +190,10 @@ export default function ChineseConverter() {
         <div>
           <div style={{
             display: "flex",
-            justifyContent: "space-between",
+            justifyContent: "flex-end",
             alignItems: "center",
             marginBottom: "8px",
           }}>
-            <label style={{
-              fontSize: "12px",
-              color: "#64748b",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-            }}>
-              {mode === "t2s" ? "簡體中文輸出" : "繁體中文輸出"}
-            </label>
             <button
               onClick={handleCopy}
               disabled={!output}

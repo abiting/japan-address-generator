@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import BlankLine from "./pages/BlankLine";
 import SlotMachine from "./pages/SlotMachine";
+import ChineseConverter from "./pages/ChineseConverter";
 
 
 function Router() {
@@ -15,6 +16,7 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/blank-line"} component={BlankLine} />
       <Route path={"/slot"} component={SlotMachine} />
+      <Route path={"/converter"} component={ChineseConverter} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

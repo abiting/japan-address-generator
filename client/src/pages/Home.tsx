@@ -126,6 +126,21 @@ export default function Home() {
           </CardContent>
         </Card>
 
+        {/* 首頁橫幅：置於生成結果與網頁說明之間 */}
+        <a
+          href="https://abiurl.me"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="前往 Abiurl.me 短網址產生器"
+          className="group block mt-8 overflow-hidden rounded-lg border border-primary/10 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <img
+            src="https://coai.abiting.cc/wp-content/uploads/2026/09/Bazaart_F9090110-0349-4151-A75B-BBC9D0F1E137-scaled.jpeg"
+            alt="Abiurl.me 短網址產生器"
+            className="block h-auto w-full transition-transform duration-300 group-hover:scale-[1.01]"
+          />
+        </a>
+
         <div className="mt-12 text-center space-y-2">
           <Button 
             onClick={handleGenerate} 

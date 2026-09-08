@@ -132,8 +132,11 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
           aria-label="前往 Abiurl.me 短網址產生器"
-          className="group block mt-8 overflow-hidden rounded-lg border border-primary/10 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="group relative block mt-8 overflow-hidden rounded-lg border border-primary/10 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
+          <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-foreground/80 px-2 py-1 text-[10px] font-medium tracking-widest text-background shadow-sm">
+            廣告
+          </span>
           <img
             src="https://coai.abiting.cc/wp-content/uploads/2026/09/Bazaart_F9090110-0349-4151-A75B-BBC9D0F1E137-scaled.jpeg"
             alt="Abiurl.me 短網址產生器"

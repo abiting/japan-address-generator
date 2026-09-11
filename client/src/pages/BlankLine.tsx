@@ -69,12 +69,42 @@ const BLANK_CHARS: BlankChar[] = [
 export default function BlankLine() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const copyChar = (char: BlankChar) => {
-    navigator.clipboard.writeText(char.char).then(() => {
+  // Clipboard API 在部分 Chrome 設定、內嵌瀏覽器或非安全內容環境可能不可用，
+  // 因此保留 execCommand 的同步備援，確保不可見字元仍可複製。
+  const copyWithFallback = (text: string) => {
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.setAttribute("readonly", "");
+    field.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+    document.body.appendChild(field);
+    field.focus();
+    field.select();
+    const copied = document.execCommand("copy");
+    document.body.removeChild(field);
+    return copied;
+  };
+
+  const copyChar = async (char: BlankChar) => {
+    let copied = false;
+
+    try {
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(char.char);
+        copied = true;
+      } else {
+        copied = copyWithFallback(char.char);
+      }
+    } catch {
+      copied = copyWithFallback(char.char);
+    }
+
+    if (copied) {
       setCopiedId(char.id);
       toast.success(`已複製「${char.name}」`);
       setTimeout(() => setCopiedId(null), 2000);
-    });
+    } else {
+      toast.error("無法存取剪貼簿，請確認瀏覽器允許此網站使用剪貼簿");
+    }
   };
 
   return (
@@ -135,7 +165,7 @@ export default function BlankLine() {
                     className="shrink-0 font-sans tracking-wide transition-all duration-200"
                     onClick={(e) => {
                       e.stopPropagation();
-                      copyChar(item);
+                      void copyChar(item);
                     }}
                   >
                     {copiedId === item.id ? (

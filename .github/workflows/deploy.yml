@@ -29,7 +29,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm exec vite build --base=/${{ github.event.repository.name }}/
+      - run: pnpm exec vite build --base=/
 
       - run: cp dist/public/index.html dist/public/404.html
 

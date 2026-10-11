@@ -67,23 +67,6 @@ export default function ChineseConverter() {
       fontFamily: "'Noto Sans TC', 'Noto Sans SC', sans-serif",
       boxSizing: "border-box",
     }}>
-      {/* 標題 */}
-      <div style={{ textAlign: "center", marginBottom: "36px" }}>
-        <h1 style={{
-          fontSize: "clamp(22px, 5vw, 36px)",
-          fontWeight: 800,
-          color: "#e2e8f0",
-          margin: 0,
-          letterSpacing: "0.05em",
-        }}>繁簡中文轉換器</h1>
-        <p style={{
-          fontSize: "18px",
-          color: "#94a3b8",
-          marginTop: "10px",
-          letterSpacing: "0.05em",
-        }}>繁簡轉換 🔁 简繁转换</p>
-      </div>
-
       {/* 模式切換 */}
       <div style={{
         display: "flex",

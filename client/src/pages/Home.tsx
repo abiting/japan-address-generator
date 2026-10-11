@@ -27,15 +27,6 @@ export default function Home() {
       {/* Decorative Background Elements - Removed as per user request */}
 
       <main className="w-full max-w-2xl z-10 relative">
-        <div className="text-center mb-12 space-y-4">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-widest text-primary">
-            Japan Address Generator
-          </h1>
-          <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed font-bold">
-            POSTAL CODE、都道府県、市区町村、町名均為真實資料，僅番地（包含丁目）為隨機生成的虛擬資訊
-          </p>
-        </div>
-
         <Card className="border-2 border-primary/10 shadow-xl bg-card/80 backdrop-blur-sm">
           <CardHeader className="border-b border-border/50 pb-6">
             <div className="flex justify-between items-center">
@@ -144,7 +135,7 @@ export default function Home() {
           />
         </a>
 
-        <div className="mt-12 text-center space-y-2">
+        <div className="mt-8 text-center">
           <Button 
             onClick={handleGenerate} 
             size="lg" 
@@ -152,21 +143,6 @@ export default function Home() {
           >
             重新生成
           </Button>
-          <div className="mt-8 space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">
-              本工具僅供示例與測試用途，請勿用於非法行為
-            </p>
-            <p className="text-xs text-muted-foreground pt-2">
-              Copyright © <a 
-                href="https://abiting.cc" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="hover:text-primary transition-colors underline decoration-dotted underline-offset-4"
-              >
-                阿比丁的第二個家
-              </a>
-            </p>
-          </div>
         </div>
       </main>
     </div>

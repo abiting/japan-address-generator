@@ -110,19 +110,8 @@ export default function BlankLine() {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <main className="w-full max-w-2xl z-10 relative">
-
-        {/* ── Header ── */}
-        <div className="text-center mb-10 space-y-3">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-widest text-primary">
-            Blank Line Generator
-          </h1>
-          <p className="text-muted-foreground font-sans tracking-wide text-sm max-w-xl mx-auto leading-relaxed font-bold">
-            複製不可見的空格（空白）符號，在 Instagram 等不支援空行的社群平台製造段落分隔效果
-          </p>
-        </div>
-
         {/* ── Character Cards ── */}
-        <div className="space-y-4 mb-8">
+        <div className="space-y-4">
           {BLANK_CHARS.map((item, index) => (
             <Card
               key={item.id}
@@ -180,19 +169,6 @@ export default function BlankLine() {
           ))}
         </div>
 
-        {/* ── Footer ── */}
-        <div className="text-center space-y-2 pb-4">
-          <p className="text-xs text-muted-foreground pt-1">
-            Copyright © <a
-              href="https://abiting.cc"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary transition-colors underline decoration-dotted underline-offset-4"
-            >
-              阿比丁的第二個家
-            </a>
-          </p>
-        </div>
       </main>
     </div>
   );
